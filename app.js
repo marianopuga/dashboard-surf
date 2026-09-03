@@ -13,6 +13,26 @@ function vec(bearing) {
   return { x: Math.sin(bearing * RAD), y: -Math.cos(bearing * RAD) };
 }
 
+const COMPASS_16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+/** Forecast hours only carry a numeric bearing; this gives them the same
+ *  compass letters the measured API responses already provide. */
+const degToCompass = (deg) => (deg == null ? null : COMPASS_16[Math.round(deg / 22.5) % 16]);
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Arrow length as a function of energy, not a fixed size — this is what makes
+ * "the swell has picked up" or "the wind is howling" readable on the map
+ * itself, not just in the numbers next to it. Swell height and wind speed are
+ * linearly mapped onto a length range and clamped, rather than modelled as
+ * true wave energy (∝ height² × period): the map needs a comparative cue, not
+ * a physically exact one, and a clamped linear scale keeps light and violent
+ * days both legible instead of one making the other invisible.
+ */
+const lenForSwell = (hs) => hs == null ? 34 : clamp(16 + ((hs - 0.3) / 2.2) * 40, 16, 58);
+const lenForWind = (kmh) => kmh == null ? 30 : clamp(14 + (kmh / 35) * 38, 14, 54);
+
 // angleDiff() and inArc() are defined in score.js, which loads first: the scoring
 // engine needs them and has to stay loadable on its own (test.html loads it
 // without app.js), so it owns them and they are in scope here already.
@@ -118,15 +138,15 @@ function readWind(spot, windFrom, kmh) {
 // and modelled forecast data score through exactly the same code path.
 // ===========================================================================
 
-/** Measured now: MHL buoy + BOM wind + interpolated tide state. */
-function condFromMeasured(swell, wind, tideNow) {
+/** Measured now: MHL buoy + BOM wind, as they arrive over the wire. */
+function condFromMeasured(swell, wind, tideState) {
   return {
     hs: swell.wave_height_hs_m ?? null,
     periodS: swell.wave_period_tp1_s ?? null,
     swellFromDeg: swell.wave_direction_deg ?? null,
     windFromDeg: wind.wind_dir_deg ?? null,
     windKmh: wind.wind_speed_kmh ?? null,
-    tideState: tideNow ? tideNow.state : null,
+    tideState: tideState ?? null,
   };
 }
 
@@ -143,24 +163,34 @@ function condFromForecast(hour, tideState) {
   };
 }
 
-function tideStateNow(tide) {
-  if (!tide || !tide.events || !tide.events.length) return null;
-  const now = new Date();
-  const events = tide.events
-    .map((e) => ({ ...e, dt: new Date(e.time_local) }))
-    .sort((a, b) => a.dt - b.dt);
-  let prev = null, next = null;
-  for (const e of events) {
-    if (e.dt <= now) prev = e;
-    if (e.dt > now && !next) next = e;
+/**
+ * The single time axis the whole page reads from. `offset` is hours from load
+ * time: 0 is "right now", using the actually-measured buoy/BOM values per the
+ * "measured for now, model for later" split; 1..48 look up that hour in the
+ * forecast series. Either way the result is the same neutral `cond` shape, an
+ * absolute timestamp, and whether it is measured or modelled — so a slider
+ * tick and the initial paint are the exact same code path.
+ */
+function condAt(offset) {
+  const ms = offset === 0 ? Date.now() : STATE.baseMs + offset * FORECAST.HOUR_MS;
+  const tideState = STATE.tideModel && STATE.tideModel.ok ? STATE.tideModel.stateAt(ms) : null;
+  if (offset === 0) {
+    return { cond: condFromMeasured(STATE.swell, STATE.wind, tideState), ms, isMeasured: true };
   }
-  if (!prev || !next) return { state: "unknown", prev, next };
-  const frac = next.dt - prev.dt > 0 ? (now - prev.dt) / (next.dt - prev.dt) : 0;
-  let state;
-  if (prev.type === "low" && frac < 0.3) state = "low";
-  else if (prev.type === "high" && frac < 0.3) state = "high";
-  else state = "mid";
-  return { state, prev, next, frac };
+  const hour = STATE.hours && STATE.hours.ok ? STATE.hours.at(ms) : null;
+  return { cond: condFromForecast(hour, tideState) ?? {}, ms, isMeasured: false };
+}
+
+/**
+ * Tide state/height/next-turn at any instant. One algorithm (the cosine
+ * interpolation in forecast.js) now serves the live "now" band, the verdict,
+ * every forecast tile, and the slider — previously "now" had its own
+ * separate, coarser calculation, which is exactly the kind of split that lets
+ * the displayed time silently disagree with itself.
+ */
+function tideAt(tideModel, ms) {
+  if (!tideModel || !tideModel.ok) return null;
+  return { state: tideModel.stateAt(ms), next: tideModel.nextAfter(ms), height: tideModel.heightAt(ms) };
 }
 
 // ===========================================================================
@@ -265,15 +295,89 @@ function crestField(from) {
   return out;
 }
 
-function renderChart(rows, swell, wind, activeId) {
+// ===========================================================================
+// Pirate chrome
+//
+// Hand-authored linework in the existing palette (Olive/Coffee/Antique ink on
+// the paper tones — no colour outside the six already in use), placed once in
+// open water clear of every pin and every arrow, so it reads as chart
+// decoration rather than competing with the instrument layer. Nothing here is
+// per-frame JS: the sway and the shimmer are CSS keyframes on a handful of
+// static elements, which is what keeps this cheap regardless of how many
+// times the slider re-renders the arrows above it.
+// ===========================================================================
+
+/** 8-point compass rose with N/E/S/W spokes drawn long, the ordinals short. */
+function compassRose(cx, cy, r) {
+  const n = (v) => v.toFixed(1);
+  let spokes = "";
+  for (let i = 0; i < 8; i++) {
+    const deg = i * 45;
+    const long = i % 2 === 0;
+    const len = long ? r : r * 0.6;
+    const v = vec(deg);
+    spokes += `<line class="rose-spoke ${long ? "rose-spoke-main" : ""}"
+      x1="${n(cx)}" y1="${n(cy)}" x2="${n(cx + v.x * len)}" y2="${n(cy + v.y * len)}"/>`;
+  }
+  const N = vec(0), S = vec(180), E = vec(90), W = vec(270);
+  return `<g class="compass-rose">
+    ${spokes}
+    <circle class="rose-ring" cx="${n(cx)}" cy="${n(cy)}" r="${r * 0.22}"/>
+    <path class="rose-needle" d="M${n(cx)} ${n(cy - r)} L${n(cx + r * 0.11)} ${n(cy)}
+      L${n(cx)} ${n(cy + r * 0.3)} L${n(cx - r * 0.11)} ${n(cy)} Z"/>
+    <text class="rose-label" x="${n(cx + N.x * (r + 9))}" y="${n(cy + N.y * (r + 9) + 3)}" text-anchor="middle">N</text>
+    <text class="rose-label" x="${n(cx + E.x * (r + 9))}" y="${n(cy + E.y * (r + 9) + 3)}" text-anchor="middle">E</text>
+    <text class="rose-label" x="${n(cx + S.x * (r + 9))}" y="${n(cy + S.y * (r + 9) + 3)}" text-anchor="middle">S</text>
+    <text class="rose-label" x="${n(cx + W.x * (r + 9))}" y="${n(cy + W.y * (r + 9) + 3)}" text-anchor="middle">W</text>
+  </g>`;
+}
+
+/** Rhumb lines radiating across the sea, the way old portolan charts cross-hatch bearings. */
+function rhumbLines(cx, cy, reach) {
+  const n = (v) => v.toFixed(1);
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    const v = vec(i * 45 + 22.5);
+    out += `<line class="rhumb" x1="${n(cx - v.x * reach)}" y1="${n(cy - v.y * reach)}"
+      x2="${n(cx + v.x * reach)}" y2="${n(cy + v.y * reach)}"/>`;
+  }
+  return out;
+}
+
+/** A small hulled ship, sails set, anchored in open water away from every spot. */
+function pirateShip(cx, cy) {
+  return `<g class="pirate-ship" style="--ox:${cx.toFixed(1)}px; --oy:${cy.toFixed(1)}px"
+      transform="translate(${cx.toFixed(1)},${cy.toFixed(1)})">
+    <path class="ship-hull" d="M-11 6 Q0 13 11 6 L8 10 Q0 14 -8 10 Z"/>
+    <line class="ship-mast" x1="0" y1="6" x2="0" y2="-16"/>
+    <path class="ship-sail" d="M0.5 -15 L0.5 1 L11 -2 Z"/>
+    <path class="ship-sail ship-sail-fore" d="M-0.5 -10 L-0.5 1 L-8 -1 Z"/>
+  </g>`;
+}
+
+/** Decorative sea-serpent linework for the chart margin, in the old-map idiom. */
+function seaMonster(cx, cy, mirror) {
+  const s = mirror ? -1 : 1;
+  return `<g class="sea-monster" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) scale(${s},1)">
+    <path class="monster-body" d="M-26 6 Q-16 -10 -6 4 Q4 18 14 4 Q20 -4 26 2"/>
+    <circle class="monster-eye" cx="26.8" cy="1.2" r="1.1"/>
+    <path class="monster-fin" d="M-6 4 L-9 -3 L-3 -1 Z"/>
+  </g>`;
+}
+
+function renderChart(rows, cond, activeId) {
   const svg = document.getElementById("chart");
   svg.setAttribute("viewBox", `${VIEW.x} 0 ${VIEW.w} ${COAST.H}`);
 
-  const swellFrom = swell.wave_direction_deg;
-  const windFrom = wind.wind_dir_deg;
+  const swellFrom = cond.swellFromDeg;
+  const windFrom = cond.windFromDeg;
+  const swellLen = lenForSwell(cond.hs);
+  const windLen = lenForWind(cond.windKmh);
 
   // Swell arrows and wind arrows share one offshore band and alternate down the
-  // coast, so you can compare them at the same stretch of beach.
+  // coast, so you can compare them at the same stretch of beach. Length now
+  // carries energy: a 2.5m swell draws a visibly longer arrow than a 0.5m one,
+  // and a howling wind longer than a breeze, on the same shared scale.
   const offshore = (yFrac, dist) => {
     const y = COAST.H * yFrac;
     return { x: Math.min(COAST.W - 26, SHORE_X(y) + dist), y };
@@ -284,13 +388,13 @@ function renderChart(rows, swell, wind, activeId) {
     field += `<g clip-path="url(#sea-clip)">${crestField(swellFrom)}</g>`;
     for (const f of [0.20, 0.52, 0.84]) {
       const p = offshore(f, 66);
-      field += swellArrow(p.x, p.y, swellFrom, 38);
+      field += swellArrow(p.x, p.y, swellFrom, swellLen);
     }
   }
   if (windFrom != null) {
     for (const f of [0.36, 0.68]) {
       const p = offshore(f, 66);
-      field += windArrow(p.x, p.y, windFrom, 38);
+      field += windArrow(p.x, p.y, windFrom, windLen);
     }
   }
 
@@ -328,10 +432,15 @@ function renderChart(rows, swell, wind, activeId) {
         // the angle between the two IS the incidence, straight off the drawing.
         `<line class="shore-normal" x1="${n(p.x)}" y1="${n(p.y)}"
            x2="${n(p.x + f.x * 34)}" y2="${n(p.y + f.y * 34)}"/>`,
-        // Held off the pin so it does not collide with the label. The field
-        // arrows already carry the wind, so only the swell is repeated here.
+        // Both arrows repeated at the selected spot, held off so they don't
+        // collide with the label — swell in Coffee, wind in Olive, so the two
+        // are told apart by colour as well as by shaft style even this close
+        // together. Both scale with the same energy the field arrows use.
         swellFrom != null
-          ? swellArrow(p.x + vec(swellFrom).x * 62, p.y + vec(swellFrom).y * 62, swellFrom, 46)
+          ? swellArrow(p.x + vec(swellFrom).x * 62, p.y + vec(swellFrom).y * 62, swellFrom, swellLen)
+          : "",
+        windFrom != null
+          ? windArrow(p.x + vec(windFrom).x * 40, p.y + vec(windFrom).y * 40, windFrom, windLen)
           : ""
       );
     }
@@ -351,11 +460,25 @@ function renderChart(rows, swell, wind, activeId) {
       text-anchor="end">${spot.short}</text>`;
   });
 
+  // Open-water fixed points for the chart decoration, well clear of every pin
+  // (which cluster within ~150–250 in this projection) and of the field-arrow
+  // band. Chosen once against the geography, not derived from spot positions,
+  // because they are chart furniture, not data.
+  const ROSE = { x: 296, y: 96, r: 19 };
+  const SHIP = { x: 272, y: 322 };
+  const MONSTER = { x: 258, y: 512 };
+
   svg.innerHTML = `
     <defs><clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath></defs>
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
       ${COAST.contours.map((d) => `<path class="depth" d="${d}"/>`).join("")}
+      <g class="chart-chrome">
+        ${rhumbLines(ROSE.x, ROSE.y, 210)}
+        ${compassRose(ROSE.x, ROSE.y, ROSE.r)}
+        ${pirateShip(SHIP.x, SHIP.y)}
+        ${seaMonster(MONSTER.x, MONSTER.y, false)}
+      </g>
     </g>
     ${field}
     <path class="land" d="${LAND_PATH}"/>
@@ -372,8 +495,24 @@ function renderChart(rows, swell, wind, activeId) {
     g.addEventListener("mouseenter", () => selectSpot(id, false));
   });
 
-  document.getElementById("chart-active").textContent =
-    SPOTS.find((s) => s.id === activeId)?.name ?? "—";
+  const activeSpot = SPOTS.find((s) => s.id === activeId);
+  document.getElementById("chart-active").textContent = activeSpot?.name ?? "—";
+  renderMapFooter(activeSpot, cond);
+}
+
+/** Wind at the selected spot, shown under the map — its own arrow, its own
+ *  colour, independent of whatever the shared field arrows are doing. */
+function renderMapFooter(spot, cond) {
+  const el = document.getElementById("chart-wind");
+  if (!spot) { el.innerHTML = ""; return; }
+  const compass = degToCompass(cond.windFromDeg);
+  el.innerHTML = cond.windFromDeg == null
+    ? `<span class="label">Wind at ${spot.short}</span><span class="cw-val">no data</span>`
+    : `<span class="label">Wind at ${spot.short}</span>
+       <svg class="cw-arrow" viewBox="0 0 16 16" aria-hidden="true">
+         ${windArrow(8, 8, cond.windFromDeg, 11, "wind")}
+       </svg>
+       <span class="cw-val num">${compass} ${Math.round(cond.windFromDeg)}° · ${cond.windKmh == null ? "—" : Math.round(cond.windKmh)} km/h</span>`;
 }
 
 const legendSvg = (inner) => `<svg viewBox="0 0 34 12" aria-hidden="true">${inner}</svg>`;
@@ -531,8 +670,8 @@ function forecastBar(spot, slots, tideModel) {
   </div>`;
 }
 
-function renderConditions(swell, wind, tide, errors, tidePending) {
-  const t = tideStateNow(tide);
+function renderConditions(swell, wind, tideModel, errors, tidePending) {
+  const t = tideAt(tideModel, Date.now());
   const tideFig = t && t.next
     ? `${t.next.height_m}<span class="unit"> m</span>`
     : `—`;
@@ -559,27 +698,31 @@ function renderConditions(swell, wind, tide, errors, tidePending) {
     </div>`;
 }
 
-function renderVerdict(row, swell, wind, tide) {
+function renderVerdict(row, cond, ms, isMeasured, tideModel) {
   const { spot, score } = row;
-  const sw = readSwell(spot, swell.wave_direction_deg);
-  const wd = readWind(spot, wind.wind_dir_deg, wind.wind_speed_kmh);
-  const t = tideStateNow(tide);
+  const sw = readSwell(spot, cond.swellFromDeg);
+  const wd = readWind(spot, cond.windFromDeg, cond.windKmh);
+  const t = tideAt(tideModel, ms);
 
   const why = [
-    swell.wave_direction_deg != null
-      ? `Swell from ${fmtDeg(swell.wave_direction_deg, swell.wave_direction_compass)} coming in <strong>${sw.text}</strong>${sw.inc != null ? ` (${Math.round(sw.inc)}° off the beach)` : ""}.`
+    cond.swellFromDeg != null
+      ? `Swell from ${fmtDeg(cond.swellFromDeg, degToCompass(cond.swellFromDeg))} coming in <strong>${sw.text}</strong>${sw.inc != null ? ` (${Math.round(sw.inc)}° off the beach)` : ""}.`
       : "No swell reading.",
-    wind.wind_dir_deg != null
-      ? `Wind from the ${wind.wind_dir_compass} at ${wind.wind_speed_kmh} km/h, <strong>${wd.text}</strong>.`
+    cond.windFromDeg != null
+      ? `Wind from the ${degToCompass(cond.windFromDeg)} at ${Math.round(cond.windKmh)} km/h, <strong>${wd.text}</strong>.`
       : "No wind reading.",
     t && t.next ? `Tide heading to ${t.next.type === "high" ? "high" : "low"} ${t.next.time_display}.` : "",
   ].join(" ");
+
+  // The heading names the moment being looked at, so scrubbing the slider
+  // never leaves the reader guessing whether this is now or a forecast.
+  const when = isMeasured ? "right now" : `at ${FORECAST.fmtWhen(ms, STATE.baseMs)}`;
 
   document.getElementById("verdict").innerHTML = `
     <article class="verdict">
       <div class="verdict-top">
         <div>
-          <span class="label">Best bet today</span>
+          <span class="label">Best bet ${when} ${isMeasured ? "" : '<span class="src-tag">forecast</span>'}</span>
           <h2>${spot.name}</h2>
         </div>
         ${badge(score)}
@@ -593,28 +736,27 @@ function renderVerdict(row, swell, wind, tide) {
     </article>`;
 }
 
-function renderSheet(rows, swell, wind, slots, tideModel) {
+function renderSheet(rows, cond, slots, tideModel) {
   const sheet = document.getElementById("sheet");
   sheet.querySelectorAll(".spot").forEach((n) => n.remove());
-  const swellFrom = swell.wave_direction_deg, windFrom = wind.wind_dir_deg;
 
   sheet.insertAdjacentHTML("beforeend", rows.map(({ spot, score }) => {
-    const sw = readSwell(spot, swellFrom);
-    const wd = readWind(spot, windFrom, wind.wind_speed_kmh);
+    const sw = readSwell(spot, cond.swellFromDeg);
+    const wd = readWind(spot, cond.windFromDeg, cond.windKmh);
     return `<li class="spot" id="spot-${spot.id}" data-spot="${spot.id}">
       <button class="spot-row" type="button" aria-expanded="false">
         <span class="spot-id">
-          ${dial(spot, swellFrom, windFrom)}
+          ${dial(spot, cond.swellFromDeg, cond.windFromDeg)}
           <span>
             <h3>${spot.name}</h3>
             <span class="kind label">${spot.kind === "reef" ? "Reef" : "Beach"}</span>
           </span>
         </span>
-        <span class="readout">
+        <span class="readout readout-swell">
           <span class="v">${sw.text}</span>
           <span class="d">window ${spot.swell_window[0]}–${spot.swell_window[1]}°</span>
         </span>
-        <span class="readout">
+        <span class="readout readout-wind">
           <span class="v">${wd.text}</span>
           <span class="d">${wd.rel != null ? `${Math.round(wd.rel)}° off offshore` : "n/a"}</span>
         </span>
@@ -669,15 +811,30 @@ function renderSheet(rows, swell, wind, slots, tideModel) {
 }
 
 // ===========================================================================
-// State
+// State and the time axis
+//
+// `STATE.hourOffset` is the one variable that makes the slider mean anything:
+// 0 is "right now" (measured), 1..48 is that many hours into the forecast.
+// Everything downstream of it — the ranking, the map arrows, the per-spot
+// readouts, which forecast-bar column is lit — is a pure function of it via
+// condAt(), so moving the slider and the initial page load run the exact same
+// code path rather than two versions that can drift apart.
 // ===========================================================================
 
-let STATE = { rows: [], swell: {}, wind: {}, activeId: null };
+// baseMs anchors offsets 1..48 to the top of the hour, not to the exact load
+// instant. The forecast series and the forecast-bar tiles both live on the
+// hour (…:00 exactly); anchoring to e.g. 19:34 would make every later offset
+// land 34 minutes off that grid, silently mismatching the tile the slider
+// claims to be on and printing a ":00" label that was never quite true.
+// Offset 0 stays exact — it always reads Date.now() directly, live.
+let STATE = { rows: [], swell: {}, wind: {}, tideModel: null, hours: null, slots: null,
+  activeId: null, hourOffset: 0, baseMs: Math.floor(Date.now() / FORECAST.HOUR_MS) * FORECAST.HOUR_MS };
 
 function selectSpot(id, scroll) {
   if (STATE.activeId === id && !scroll) return;
   STATE.activeId = id;
-  renderChart(STATE.rows, STATE.swell, STATE.wind, id);
+  const { cond } = condAt(STATE.hourOffset);
+  renderChart(STATE.rows, cond, id);
   document.querySelectorAll(".spot").forEach((li) =>
     li.classList.toggle("is-active", li.dataset.spot === id));
   if (scroll) document.getElementById(`spot-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -689,35 +846,129 @@ async function fetchJson(url) {
   return res.json();
 }
 
-/** One full pass over the data. Cheap enough to simply re-run when tide lands. */
-function render(swell, wind, tide, forecast, errors, tidePending) {
-  renderConditions(swell, wind, tide, errors, tidePending);
+/**
+ * Move the whole page to a given hour offset (0 = now, 1..48 = forecast) and
+ * repaint everything that depends on time. Called on load and on every slider
+ * step, which is also why it stays cheap: the forecast bars themselves are
+ * NOT rebuilt here (their 200+ tiles are static — only which column is "now"
+ * changes), and the ranked list keeps its geographic order rather than
+ * reshuffling under the reader's cursor on every tick; only the verdict card
+ * — the actual answer to "where's best right now" — reorders.
+ */
+function retime(offset) {
+  STATE.hourOffset = offset;
+  const { cond, ms, isMeasured } = condAt(offset);
 
-  const tideNow = tideStateNow(tide);
-  const cond = condFromMeasured(swell, wind, tideNow);
   const rows = SPOTS.map((spot) => ({ spot, score: SCORE.scoreSpot(spot, cond) }));
-
-  // Tier first, then the continuous score within the tier.
   const best = rows.slice().sort(SCORE.compareScored)[0];
   const byOrder = rows.slice().sort((a, b) => a.spot.order - b.spot.order);
+  STATE.rows = byOrder;
 
-  const tideModel = FORECAST.buildTide(tide);
-  const hours = FORECAST.buildHours(forecast);
-  const slots = FORECAST.buildSlots(hours, Date.now());
+  renderVerdict(best, cond, ms, isMeasured, STATE.tideModel);
+  updateSheetForTime(byOrder, cond);
+  updateForecastHighlight(ms);
+  renderChart(byOrder, cond, STATE.activeId ?? best.spot.id);
+  renderTimeControl(offset, ms, isMeasured);
+  document.querySelector(`.spot[data-spot="${STATE.activeId ?? best.spot.id}"]`)?.classList.add("is-active");
+}
 
-  // Keep whatever the reader was looking at across the tide re-render.
-  const active = STATE.activeId ?? best.spot.id;
-  STATE = { rows: byOrder, swell, wind, hours, tideModel, slots, activeId: active };
+/** Patch the already-rendered rows in place: dial, readouts, badge, meters. */
+function updateSheetForTime(rows, cond) {
+  for (const { spot, score } of rows) {
+    const li = document.querySelector(`.spot[data-spot="${spot.id}"]`);
+    if (!li) continue;
+    const sw = readSwell(spot, cond.swellFromDeg);
+    const wd = readWind(spot, cond.windFromDeg, cond.windKmh);
 
-  renderVerdict(best, swell, wind, tide);
-  renderSheet(byOrder, swell, wind, slots, tideModel);
+    const dialEl = li.querySelector(".dial");
+    if (dialEl) dialEl.outerHTML = dial(spot, cond.swellFromDeg, cond.windFromDeg);
+
+    const rs = li.querySelector(".readout-swell");
+    if (rs) rs.innerHTML = `<span class="v">${sw.text}</span>
+      <span class="d">window ${spot.swell_window[0]}–${spot.swell_window[1]}°</span>`;
+    const rw = li.querySelector(".readout-wind");
+    if (rw) rw.innerHTML = `<span class="v">${wd.text}</span>
+      <span class="d">${wd.rel != null ? `${Math.round(wd.rel)}° off offshore` : "n/a"}</span>`;
+
+    const badgeEl = li.querySelector(".spot-row .badge");
+    if (badgeEl) badgeEl.outerHTML = badge(score);
+
+    const metricsEl = li.querySelector(".spot-detail .metrics");
+    if (metricsEl) metricsEl.innerHTML =
+      meter("Swell", score.swell, score.swell < 0.5) +
+      meter("Wind", score.wind, score.wind < 0.5) +
+      meter("Tide", score.tide, score.tide < 0.5);
+  }
+}
+
+/** Lights up the forecast-bar column matching the slider's hour, if one exists
+ *  at that exact hour — the bars are curated slices of the week, the slider
+ *  covers every hour, so most positions between tiles simply light nothing. */
+function updateForecastHighlight(ms) {
+  const snapped = Math.round(ms / FORECAST.HOUR_MS) * FORECAST.HOUR_MS;
+  document.querySelectorAll(".fc-tile.is-now").forEach((el) => el.classList.remove("is-now"));
+  document.querySelectorAll(`.fc-tile[data-ts="${snapped}"]`).forEach((el) => el.classList.add("is-now"));
+}
+
+/** The always-visible time readout and control state. */
+function renderTimeControl(offset, ms, isMeasured) {
+  const label = document.getElementById("time-label");
+  if (label) {
+    label.textContent = isMeasured ? "Now — measured" : FORECAST.fmtWhen(ms, STATE.baseMs);
+    label.classList.toggle("is-forecast", !isMeasured);
+  }
+  const slider = document.getElementById("time-slider");
+  if (slider && Number(slider.value) !== offset) slider.value = offset;
+  const back = document.getElementById("time-back"), fwd = document.getElementById("time-fwd");
+  if (back) back.disabled = offset <= 0;
+  if (fwd) fwd.disabled = offset >= 48;
+}
+
+function wireTimeControl() {
+  const slider = document.getElementById("time-slider");
+  const back = document.getElementById("time-back"), fwd = document.getElementById("time-fwd");
+  // retime() only touches 11 rows and rebuilds one small SVG, so there is no
+  // real cost in calling it straight from the event — an rAF-coalesced
+  // version was tried here first, but on a backgrounded or occluded tab a
+  // rAF callback can be deferred indefinitely, which made the slider
+  // silently stop updating. Direct and synchronous is both simpler and more
+  // reliable, and it's not slow enough to need the indirection anyway.
+  slider?.addEventListener("input", (e) => retime(Number(e.target.value)));
+  back?.addEventListener("click", () => retime(clamp(STATE.hourOffset - 1, 0, 48)));
+  fwd?.addEventListener("click", () => retime(clamp(STATE.hourOffset + 1, 0, 48)));
+}
+
+/** The one-time page skeleton: conditions band, legend, and the static (per
+ *  load, not per hour) forecast bars. `retime(0)` then does the first paint of
+ *  everything time-dependent, exactly as every later slider move will. */
+function renderShell(swell, wind, tide, forecast, errors, tidePending) {
+  STATE.swell = swell;
+  STATE.wind = wind;
+  STATE.tideModel = FORECAST.buildTide(tide);
+  STATE.hours = FORECAST.buildHours(forecast);
+  // The true instant, not the floored baseMs: "has this tile already passed"
+  // has to be judged against the actual current time, or a tile can hang
+  // around after its hour has gone (baseMs floors down, so a tile up to 59
+  // minutes stale would still read as "upcoming"). baseMs stays reserved for
+  // the slider's own hour arithmetic in condAt(), a separate concern.
+  STATE.slots = FORECAST.buildSlots(STATE.hours, Date.now());
+
+  renderConditions(swell, wind, STATE.tideModel, errors, tidePending);
   renderLegend();
-  renderChart(byOrder, swell, wind, active);
-  document.querySelector(`.spot[data-spot="${active}"]`)?.classList.add("is-active");
+
+  const seedCond = condAt(0).cond;
+  const seedRows = SPOTS.map((spot) => ({ spot, score: SCORE.scoreSpot(spot, seedCond) }))
+    .sort((a, b) => a.spot.order - b.spot.order);
+  renderSheet(seedRows, seedCond, STATE.slots, STATE.tideModel);
+  STATE.activeId = STATE.activeId
+    ?? seedRows.slice().sort(SCORE.compareScored)[0].spot.id;
+
+  retime(STATE.hourOffset);
 }
 
 async function main() {
   for (const spot of SPOTS) spot.xy = snapToShore(project(spot.lat, spot.lng));
+  wireTimeControl();
 
   const swellP = fetchJson("/api/mhl");
   const windP = fetchJson("/api/wind");
@@ -738,13 +989,13 @@ async function main() {
   const errors = [];
   const swell = take(swellR, "Couldn't read the MHL buoy", errors);
   const wind = take(windR, "Couldn't read BOM wind", errors);
-  render(swell, wind, {}, {}, errors, true);
+  renderShell(swell, wind, {}, {}, errors, true);
 
   const [tideR, forecastR] = await Promise.allSettled([tideP, forecastP]);
   const later = errors.slice();
   const tide = take(tideR, "Couldn't read BOM tide", later);
   const forecast = take(forecastR, "Couldn't read the forecast", later);
-  render(swell, wind, tide, forecast, later);
+  renderShell(swell, wind, tide, forecast, later, false);
 }
 
 main();

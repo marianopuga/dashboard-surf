@@ -37,6 +37,21 @@
           <svg id="chart" preserveAspectRatio="xMidYMid meet" role="img"
                aria-label="Chart of the coast showing swell and wind direction"></svg>
         </div>
+
+        <div class="time-control">
+          <div class="time-readout">
+            <span class="label">Time</span>
+            <span id="time-label" class="time-label">Now — measured</span>
+          </div>
+          <div class="time-scrub">
+            <button id="time-back" class="time-step" type="button" aria-label="Back 1 hour">−1h</button>
+            <input id="time-slider" type="range" min="0" max="48" step="1" value="0"
+                   aria-label="Hours from now" />
+            <button id="time-fwd" class="time-step" type="button" aria-label="Forward 1 hour">+1h</button>
+          </div>
+        </div>
+
+        <div id="chart-wind" class="chart-wind"></div>
         <div class="chart-legend" id="chart-legend"></div>
       </div>
     </div>
