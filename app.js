@@ -471,6 +471,66 @@ function badge(score) {
   </span>`;
 }
 
+// ===========================================================================
+// Forecast bar
+//
+// Two sections per spot: today in five parts, then morning/afternoon across the
+// week. Each scrolls inside itself — the page itself must never scroll
+// sideways, which is the whole constraint at 375px.
+//
+// Tiles carry the tier the same way the badges do (fill, glyph, and for the
+// arrows a hue) rather than by colour alone. Arrows are CSS border triangles
+// rotated by the travel bearing: at this size a shape distinction would be
+// illegible anyway, and 200+ inline SVGs would cost more than they return.
+// ===========================================================================
+
+function forecastTile(spot, slot, tideModel) {
+  const h = slot.hour;
+  const tideState = tideModel.ok ? tideModel.stateAt(slot.ts) : null;
+  const cond = condFromForecast(h, tideState);
+  const score = SCORE.scoreSpot(spot, cond);
+  const swellTravel = h.swellFromDeg == null ? null : (h.swellFromDeg + 180) % 360;
+  const windTravel = h.windFromDeg == null ? null : (h.windFromDeg + 180) % 360;
+
+  return `<div class="fc-tile ${score.tierCls}" data-ts="${slot.ts}" data-spot="${spot.id}"
+     title="${slot.label} · ${fmtNum(h.hs, 1)} m · wind ${Math.round(h.windKmh ?? 0)} km/h · ${score.tierLabel}">
+    <span class="fc-when">${slot.label}</span>
+    <span class="fc-hs num">${fmtNum(h.hs, 1)}</span>
+    <span class="fc-arrows">
+      ${swellTravel == null ? "" : `<i class="fc-arr fc-sw" style="--rot:${Math.round(swellTravel)}deg"></i>`}
+      ${windTravel == null ? "" : `<i class="fc-arr fc-wd" style="--rot:${Math.round(windTravel)}deg"></i>`}
+    </span>
+    <span class="fc-wind num">${h.windKmh == null ? "—" : Math.round(h.windKmh)}</span>
+  </div>`;
+}
+
+function forecastBar(spot, slots, tideModel) {
+  if (!slots.today.length && !slots.week.length) return "";
+
+  // Once the last of today's slots has passed, the detail strip rolls on to
+  // tomorrow — so the heading has to follow it rather than always say "Today".
+  const head = slots.today.length ? slots.today[0].dayLabel : "Today";
+
+  // Every column carries a day cell, blank when it is not the first of its day.
+  // Without it the labelled and unlabelled columns start at different heights.
+  const dayCell = (s, i, arr) => {
+    const first = i === 0 || arr[i - 1].day.dayKey !== s.day.dayKey;
+    return `<span class="fc-day">${first ? s.day.weekday : ""}</span>`;
+  };
+
+  return `<div class="fc">
+    <div class="fc-section fc-section-today">
+      <span class="fc-head label">${head}</span>
+      <div class="fc-strip">${slots.today.map((s) => forecastTile(spot, s, tideModel)).join("")}</div>
+    </div>
+    <div class="fc-section fc-section-week">
+      <span class="fc-head label">Next 7 days</span>
+      <div class="fc-strip">${slots.week.map((s, i, arr) =>
+        `<div class="fc-col">${dayCell(s, i, arr)}${forecastTile(spot, s, tideModel)}</div>`).join("")}</div>
+    </div>
+  </div>`;
+}
+
 function renderConditions(swell, wind, tide, errors, tidePending) {
   const t = tideStateNow(tide);
   const tideFig = t && t.next
@@ -533,7 +593,7 @@ function renderVerdict(row, swell, wind, tide) {
     </article>`;
 }
 
-function renderSheet(rows, swell, wind) {
+function renderSheet(rows, swell, wind, slots, tideModel) {
   const sheet = document.getElementById("sheet");
   sheet.querySelectorAll(".spot").forEach((n) => n.remove());
   const swellFrom = swell.wave_direction_deg, windFrom = wind.wind_dir_deg;
@@ -560,6 +620,7 @@ function renderSheet(rows, swell, wind) {
         </span>
         ${badge(score)}
       </button>
+      ${forecastBar(spot, slots, tideModel)}
       <div class="spot-detail" hidden>
         <p>${spot.note}</p>
         <div class="metrics">
@@ -629,7 +690,7 @@ async function fetchJson(url) {
 }
 
 /** One full pass over the data. Cheap enough to simply re-run when tide lands. */
-function render(swell, wind, tide, errors, tidePending) {
+function render(swell, wind, tide, forecast, errors, tidePending) {
   renderConditions(swell, wind, tide, errors, tidePending);
 
   const tideNow = tideStateNow(tide);
@@ -640,12 +701,16 @@ function render(swell, wind, tide, errors, tidePending) {
   const best = rows.slice().sort(SCORE.compareScored)[0];
   const byOrder = rows.slice().sort((a, b) => a.spot.order - b.spot.order);
 
+  const tideModel = FORECAST.buildTide(tide);
+  const hours = FORECAST.buildHours(forecast);
+  const slots = FORECAST.buildSlots(hours, Date.now());
+
   // Keep whatever the reader was looking at across the tide re-render.
   const active = STATE.activeId ?? best.spot.id;
-  STATE = { rows: byOrder, swell, wind, activeId: active };
+  STATE = { rows: byOrder, swell, wind, hours, tideModel, slots, activeId: active };
 
   renderVerdict(best, swell, wind, tide);
-  renderSheet(byOrder, swell, wind);
+  renderSheet(byOrder, swell, wind, slots, tideModel);
   renderLegend();
   renderChart(byOrder, swell, wind, active);
   document.querySelector(`.spot[data-spot="${active}"]`)?.classList.add("is-active");
@@ -657,6 +722,7 @@ async function main() {
   const swellP = fetchJson("/api/mhl");
   const windP = fetchJson("/api/wind");
   const tideP = fetchJson("/api/tide");
+  const forecastP = fetchJson("/api/forecast");
 
   const take = (r, msg, errors) => {
     if (r.status === "fulfilled" && !r.value.error) return r.value;
@@ -664,19 +730,21 @@ async function main() {
     return {};
   };
 
-  // Swell and wind are what the ranking turns on, and both are fast. The BOM
-  // tide table is an HTML scrape and can take several seconds — waiting on it
-  // held the whole page blank, so paint without it and fold it in when it lands.
+  // Swell and wind are what the headline turns on, and both are fast. The BOM
+  // tide table is an HTML scrape and the forecast is two upstream calls, either
+  // of which can take seconds — waiting on them held the whole page blank, so
+  // paint without them and fold each in as it lands.
   const [swellR, windR] = await Promise.allSettled([swellP, windP]);
   const errors = [];
   const swell = take(swellR, "Couldn't read the MHL buoy", errors);
   const wind = take(windR, "Couldn't read BOM wind", errors);
-  render(swell, wind, {}, errors, true);
+  render(swell, wind, {}, {}, errors, true);
 
-  const tideR = await Promise.allSettled([tideP]).then((r) => r[0]);
-  const tideErrors = errors.slice();
-  const tide = take(tideR, "Couldn't read BOM tide", tideErrors);
-  render(swell, wind, tide, tideErrors);
+  const [tideR, forecastR] = await Promise.allSettled([tideP, forecastP]);
+  const later = errors.slice();
+  const tide = take(tideR, "Couldn't read BOM tide", later);
+  const forecast = take(forecastR, "Couldn't read the forecast", later);
+  render(swell, wind, tide, forecast, later);
 }
 
 main();

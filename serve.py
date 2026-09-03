@@ -18,6 +18,7 @@ ROUTES = {
     "/api/mhl": _lib.get_latest_swell,
     "/api/wind": _lib.get_latest_wind,
     "/api/tide": _lib.get_tide_events,
+    "/api/forecast": _lib.get_forecast,
 }
 
 
