@@ -448,9 +448,10 @@ function renderChart(rows, cond, activeId) {
   // (which cluster within ~150–250 in this projection) and of the field-arrow
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
+  // No rose is drawn any more, but the rhumb lines still need a node to
+  // radiate from — an unmarked bearing node is ordinary on a portolan chart.
   const ROSE = { x: 266, y: 566, r: 20 };
   const SHIP = { x: 262, y: 352 };
-  const SERPENT = { x: 248, y: 560 };
 
   svg.innerHTML = `
     <defs><clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath></defs>
@@ -463,10 +464,7 @@ function renderChart(rows, cond, activeId) {
     </g>
     ${field}
     <g class="chart-chrome" clip-path="url(#sea-clip)">
-      ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
-        { x: 0.233, y: 0.532, w: 0.107, h: 0.146 }, ROSE.x, ROSE.y, 74, "rose")}
-      ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
-        { x: 0.372, y: 0.452, w: 0.192, h: 0.335 }, SHIP.x, SHIP.y, 124, "ship")}
+      ${CHROME.plate("assets/ship-cutout.png", SHIP.x, SHIP.y, 86, "ship", 293 / 210)}
     </g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
