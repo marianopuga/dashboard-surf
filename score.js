@@ -22,15 +22,24 @@
 // number. A weighted sum can drift as weights are tuned; a rule cannot. The
 // rubric this encodes is:
 //
-//   prime — head high or overhead, with offshore wind
-//   ok    — rideable, with offshore wind or no real wind at all
-//   flat  — anything else
+//   going off its tits — overhead, offshore, on long-period ground swell
+//   pumping            — head high or overhead, with offshore wind
+//   ok                 — rideable, with offshore wind or no real wind at all
+//   flat               — anything else
 //
-// The continuous `total` exists only to order spots *within* a tier.
+// The continuous `total` exists only to order spots *within* a tier. The three
+// contributions it is built from are shown permanently in the UI, so they are
+// deliberately harsh: direction and size multiply rather than average, wind
+// falls off as a cosine rather than linearly, and tide reports null where the
+// spot has no tide preference instead of a free 1.0. An earlier, gentler set
+// produced the obvious tell that a "flat" spot could still show swell in the
+// seventies and tide at a hundred.
 // ===========================================================================
 
 /** Wind at or below this is treated as "no wind" for rubric purposes. */
 const LIGHT_WIND_KMH = 10;
+
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 /** Smallest angle between two compass bearings, 0–180. */
 function angleDiff(a, b) {
@@ -110,47 +119,81 @@ function classifyWind(spot, windFromDeg, windKmh) {
 
 // --- continuous contributions, used for the visible breakdown and ordering ---
 
+/**
+ * Size fit across a spot's rideable band. The falloff inside the band is steep
+ * on purpose: the old 0.3 coefficient meant anything merely *rideable* scored
+ * at least 0.7, so a knee-high day still showed a swell score in the high
+ * seventies. At 0.65 the bottom of the band scores ~0.35, which is what
+ * "technically surfable" should look like next to a properly good day.
+ */
 function triangularScore(v, [lo, hi]) {
   if (v == null) return 0.5;
   const mid = (lo + hi) / 2;
-  if (v >= lo && v <= hi) return 1 - (0.3 * Math.abs(v - mid)) / ((hi - lo) / 2 || 1);
+  if (v >= lo && v <= hi) return 1 - (0.65 * Math.abs(v - mid)) / ((hi - lo) / 2 || 1);
   const dist = v < lo ? lo - v : v - hi;
-  return Math.max(0, 1 - dist / (hi - lo || 1));
+  return Math.max(0, 0.35 - dist / (hi - lo || 1));
 }
 
+/**
+ * How well the swell direction gets into this spot at all. Full marks inside
+ * the window, half by the edge of the shoulder, nothing much beyond it — the
+ * old version gave a swell 60° off the window ~0.5 just for existing, which is
+ * why a "flat" spot could still show a swell score in the seventies.
+ */
+function windowFit(spot, cond) {
+  const miss = arcMiss(cond.swellFromDeg, spot.swell_window[0], spot.swell_window[1]);
+  if (miss === 0) return 1;
+  if (miss <= WINDOW_SHOULDER_DEG) return 1 - 0.5 * (miss / WINDOW_SHOULDER_DEG);
+  return Math.max(0, 0.5 - 0.5 * ((miss - WINDOW_SHOULDER_DEG) / 40));
+}
+
+/** Direction and size multiply rather than average: a perfect size in a swell
+ *  the beach cannot see is still nothing, and the number should say so. */
 function swellContribution(spot, cond) {
-  const [dmin, dmax] = spot.swell_window;
-  const centre = (dmin + dmax) / 2;
-  const halfWidth = (dmax - dmin) / 2;
-  const dirDiff = angleDiff(cond.swellFromDeg, centre) ?? 90;
-  const dirFit = Math.max(0, 1 - dirDiff / (halfWidth + 40));
+  if (cond.hs == null || cond.swellFromDeg == null) return 0;
   const sizeFit = triangularScore(cond.hs, spot.good_size_m);
   const periodGate = spot.min_period_s
-    ? (cond.periodS != null && cond.periodS >= spot.min_period_s ? 1 : 0.4)
+    ? (cond.periodS != null && cond.periodS >= spot.min_period_s ? 1 : 0.35)
     : 1;
-  return Math.max(0, Math.min(1, dirFit * 0.5 + sizeFit * 0.5)) * periodGate;
+  return clamp01(windowFit(spot, cond) * sizeFit * periodGate);
 }
 
+/**
+ * Wind quality, falling off as a raised cosine from straight offshore. The
+ * previous linear `1 - rel/180` scored a full cross-shore at 0.5, which reads
+ * as "half decent" for a wind that is actually ruining the wave. This gives
+ * roughly: offshore 1.0, 45° 0.78, cross-shore 0.33, 135° 0.05, onshore 0.
+ */
 function windContribution(spot, cond) {
   const w = classifyWind(spot, cond.windFromDeg, cond.windKmh);
-  if (w.rel == null) return w.light ? 0.7 : 0.5;
-  let base = 1 - w.rel / 180;
-  if (w.light) base = Math.max(base, 0.7); // glassy forgives a poor direction
-  if (cond.windKmh != null && cond.windKmh > 20 && w.rel > 120) base = Math.min(base, 0.15);
-  return Math.max(0, Math.min(1, base));
+  if (w.rel == null) return w.light ? 0.65 : 0.4;
+  let base = Math.pow((1 + Math.cos(w.rel * Math.PI / 180)) / 2, 1.6);
+  // Glassy forgives direction — but only up to "fine", never to "great".
+  if (w.light) base = Math.max(base, 0.65);
+  if (cond.windKmh != null && cond.windKmh > 20 && w.rel > 110) base = Math.min(base, 0.08);
+  if (cond.windKmh != null && cond.windKmh > 30) base *= 0.75; // even offshore gets bumpy
+  return clamp01(base);
 }
 
+/**
+ * Null — not 1 — where the spot has no tide preference. Showing a flat 100 for
+ * every beach made the breakdown look like tide was carrying the score when it
+ * simply does not apply; the UI renders null as "n/a".
+ */
 function tideContribution(spot, cond) {
-  if (spot.tide_pref !== "mid-high" || !cond.tideState) return 1;
-  if (cond.tideState === "low") return 0.4;
-  if (cond.tideState === "rising-from-low") return 0.7;
+  if (spot.tide_pref !== "mid-high") return null;
+  if (!cond.tideState) return null;
+  if (cond.tideState === "low") return 0.25;
+  if (cond.tideState === "rising-from-low") return 0.6;
+  if (cond.tideState === "high") return 0.9;
   return 1;
 }
 
 // --- the rubric ------------------------------------------------------------
 
 const TIERS = {
-  prime: { key: "prime", label: "prime", cls: "q-prime", rank: 3 },
+  epic: { key: "epic", label: "going off its tits", cls: "q-epic", rank: 4 },
+  pumping: { key: "pumping", label: "pumping", cls: "q-pumping", rank: 3 },
   ok: { key: "ok", label: "ok", cls: "q-ok", rank: 2 },
   flat: { key: "flat", label: "flat", cls: "q-flat", rank: 1 },
 };
@@ -172,16 +215,24 @@ function scoreSpot(spot, cond) {
   const swell = swellContribution(spot, cond);
   const windScore = windContribution(spot, cond);
   const tide = tideContribution(spot, cond);
-  const total = swell * 0.45 + windScore * 0.4 + tide * 0.15;
+  // Tide only enters the weighted total where it actually applies, otherwise
+  // its weight is redistributed instead of being filled with a free 1.0.
+  const total = tide == null
+    ? swell * 0.55 + windScore * 0.45
+    : swell * 0.45 + windScore * 0.4 + tide * 0.15;
+
+  // Long-period ground swell is what separates a big day from a great one.
+  const groundSwell = cond.periodS != null && cond.periodS >= 11;
 
   let tier;
-  if (rideable && atLeastHeadHigh(sizeClass) && wind.dir === "offshore") tier = TIERS.prime;
+  if (rideable && sizeClass === "overhead" && wind.dir === "offshore" && groundSwell) tier = TIERS.epic;
+  else if (rideable && atLeastHeadHigh(sizeClass) && wind.dir === "offshore") tier = TIERS.pumping;
   else if (rideable && (wind.dir === "offshore" || wind.light)) tier = TIERS.ok;
   else tier = TIERS.flat;
 
-  // A shallow reef at dead low is not prime however good the swell looks.
+  // A shallow reef at dead low is not pumping however good the swell looks.
   let demoted = false;
-  if (tier === TIERS.prime && spot.tide_pref === "mid-high" && cond.tideState === "low") {
+  if (tier.rank >= 3 && spot.tide_pref === "mid-high" && cond.tideState === "low") {
     tier = TIERS.ok;
     demoted = true;
   }
@@ -221,6 +272,8 @@ const SCORE = {
   angleDiff,
   inArc,
   arcMiss,
+  windowFit,
+  clamp01,
   WINDOW_SHOULDER_DEG,
   classifySize,
   classifyWind,

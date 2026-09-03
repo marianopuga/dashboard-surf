@@ -279,16 +279,18 @@ const VIEW = { x: GUTTER, w: COAST.W - GUTTER };
 const LAND_PATH = `${COAST.coast} L${GUTTER - 60} -60 L${GUTTER - 60} ${COAST.H + 60} Z`;
 const SEA_PATH = `${COAST.coast} L${COAST.W + 60} -60 L${COAST.W + 60} ${COAST.H + 60} Z`;
 
+const CREST_SPACING = 26;
+
 /** Parallel swell crest lines — the wave train, marching at the coast. */
 function crestField(from) {
   const t = (from + 180) % 360;
   const d = vec(t);
   const p = { x: -d.y, y: d.x };
   const cx = COAST.W / 2, cy = COAST.H / 2;
-  const reach = Math.hypot(COAST.W, COAST.H);
+  const reach = Math.hypot(COAST.W, COAST.H) * 1.2;
   let out = "";
-  for (let k = -Math.ceil(reach / 2 / 30); k <= Math.ceil(reach / 2 / 30); k++) {
-    const ax = cx + d.x * k * 30, ay = cy + d.y * k * 30;
+  for (let k = -Math.ceil(reach / 2 / CREST_SPACING); k <= Math.ceil(reach / 2 / CREST_SPACING); k++) {
+    const ax = cx + d.x * k * CREST_SPACING, ay = cy + d.y * k * CREST_SPACING;
     out += `<line class="swell-crest" x1="${(ax - p.x * reach).toFixed(1)}" y1="${(ay - p.y * reach).toFixed(1)}"
       x2="${(ax + p.x * reach).toFixed(1)}" y2="${(ay + p.y * reach).toFixed(1)}"/>`;
   }
@@ -296,72 +298,46 @@ function crestField(from) {
 }
 
 // ===========================================================================
-// Pirate chrome
+// The chart
 //
-// Hand-authored linework in the existing palette (Olive/Coffee/Antique ink on
-// the paper tones — no colour outside the six already in use), placed once in
-// open water clear of every pin and every arrow, so it reads as chart
-// decoration rather than competing with the instrument layer. Nothing here is
-// per-frame JS: the sway and the shimmer are CSS keyframes on a handful of
-// static elements, which is what keeps this cheap regardless of how many
-// times the slider re-renders the arrows above it.
+// Decoration (compass rose, galleon, sea serpent) lives in chrome.js; this
+// file stays about data. Arrows are no longer drawn as an ambient field over
+// the water — they belong to a spot, and appear only when one is selected.
 // ===========================================================================
 
-/** 8-point compass rose with N/E/S/W spokes drawn long, the ordinals short. */
-function compassRose(cx, cy, r) {
-  const n = (v) => v.toFixed(1);
-  let spokes = "";
-  for (let i = 0; i < 8; i++) {
-    const deg = i * 45;
-    const long = i % 2 === 0;
-    const len = long ? r : r * 0.6;
-    const v = vec(deg);
-    spokes += `<line class="rose-spoke ${long ? "rose-spoke-main" : ""}"
-      x1="${n(cx)}" y1="${n(cy)}" x2="${n(cx + v.x * len)}" y2="${n(cy + v.y * len)}"/>`;
-  }
-  const N = vec(0), S = vec(180), E = vec(90), W = vec(270);
-  return `<g class="compass-rose">
-    ${spokes}
-    <circle class="rose-ring" cx="${n(cx)}" cy="${n(cy)}" r="${r * 0.22}"/>
-    <path class="rose-needle" d="M${n(cx)} ${n(cy - r)} L${n(cx + r * 0.11)} ${n(cy)}
-      L${n(cx)} ${n(cy + r * 0.3)} L${n(cx - r * 0.11)} ${n(cy)} Z"/>
-    <text class="rose-label" x="${n(cx + N.x * (r + 9))}" y="${n(cy + N.y * (r + 9) + 3)}" text-anchor="middle">N</text>
-    <text class="rose-label" x="${n(cx + E.x * (r + 9))}" y="${n(cy + E.y * (r + 9) + 3)}" text-anchor="middle">E</text>
-    <text class="rose-label" x="${n(cx + S.x * (r + 9))}" y="${n(cy + S.y * (r + 9) + 3)}" text-anchor="middle">S</text>
-    <text class="rose-label" x="${n(cx + W.x * (r + 9))}" y="${n(cy + W.y * (r + 9) + 3)}" text-anchor="middle">W</text>
-  </g>`;
-}
+/**
+ * A vertical tide gauge on the chart: the column fills toward high water and
+ * drains toward low. Height comes from the same cosine interpolation that
+ * feeds the scoring, so the gauge and the tide score can never disagree, and
+ * it is normalised against the actual range of the published tide table rather
+ * than a fixed 0–2 m so a neap day still uses the whole column.
+ */
+function tideGauge(cond, x, h) {
+  const t = STATE.tideModel;
+  if (!t || !t.ok) return "";
+  const ms = STATE.ms ?? Date.now();
+  const height = t.heightAt(ms);
+  if (height == null) return "";
 
-/** Rhumb lines radiating across the sea, the way old portolan charts cross-hatch bearings. */
-function rhumbLines(cx, cy, reach) {
-  const n = (v) => v.toFixed(1);
-  let out = "";
-  for (let i = 0; i < 8; i++) {
-    const v = vec(i * 45 + 22.5);
-    out += `<line class="rhumb" x1="${n(cx - v.x * reach)}" y1="${n(cy - v.y * reach)}"
-      x2="${n(cx + v.x * reach)}" y2="${n(cy + v.y * reach)}"/>`;
-  }
-  return out;
-}
+  const hs = t.events.map((e) => e.height_m);
+  const lo = Math.min(...hs), hi = Math.max(...hs);
+  const frac = hi > lo ? clamp((height - lo) / (hi - lo), 0, 1) : 0.5;
 
-/** A small hulled ship, sails set, anchored in open water away from every spot. */
-function pirateShip(cx, cy) {
-  return `<g class="pirate-ship" style="--ox:${cx.toFixed(1)}px; --oy:${cy.toFixed(1)}px"
-      transform="translate(${cx.toFixed(1)},${cy.toFixed(1)})">
-    <path class="ship-hull" d="M-11 6 Q0 13 11 6 L8 10 Q0 14 -8 10 Z"/>
-    <line class="ship-mast" x1="0" y1="6" x2="0" y2="-16"/>
-    <path class="ship-sail" d="M0.5 -15 L0.5 1 L11 -2 Z"/>
-    <path class="ship-sail ship-sail-fore" d="M-0.5 -10 L-0.5 1 L-8 -1 Z"/>
-  </g>`;
-}
+  const y = 40, w = 9;
+  const fillH = h * frac;
+  const next = t.nextAfter(ms);
+  const rising = next ? next.type === "high" : null;
 
-/** Decorative sea-serpent linework for the chart margin, in the old-map idiom. */
-function seaMonster(cx, cy, mirror) {
-  const s = mirror ? -1 : 1;
-  return `<g class="sea-monster" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) scale(${s},1)">
-    <path class="monster-body" d="M-26 6 Q-16 -10 -6 4 Q4 18 14 4 Q20 -4 26 2"/>
-    <circle class="monster-eye" cx="26.8" cy="1.2" r="1.1"/>
-    <path class="monster-fin" d="M-6 4 L-9 -3 L-3 -1 Z"/>
+  return `<g class="tide-gauge">
+    <text class="tide-cap" x="${x + w / 2}" y="${y - 10}" text-anchor="middle">TIDE</text>
+    <rect class="tide-tube" x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5"/>
+    <rect class="tide-fill" x="${x}" y="${(y + h - fillH).toFixed(1)}" width="${w}"
+          height="${fillH.toFixed(1)}" rx="1.5"/>
+    <line class="tide-mark" x1="${x - 3}" y1="${(y + h - fillH).toFixed(1)}"
+          x2="${x + w + 3}" y2="${(y + h - fillH).toFixed(1)}"/>
+    <text class="tide-val" x="${x + w + 6}" y="${(y + h - fillH + 3).toFixed(1)}">${height.toFixed(1)}m</text>
+    ${rising == null ? "" : `<text class="tide-cap" x="${x + w / 2}" y="${y + h + 12}"
+      text-anchor="middle">${rising ? "▲" : "▼"}</text>`}
   </g>`;
 }
 
@@ -374,28 +350,19 @@ function renderChart(rows, cond, activeId) {
   const swellLen = lenForSwell(cond.hs);
   const windLen = lenForWind(cond.windKmh);
 
-  // Swell arrows and wind arrows share one offshore band and alternate down the
-  // coast, so you can compare them at the same stretch of beach. Length now
-  // carries energy: a 2.5m swell draws a visibly longer arrow than a 0.5m one,
-  // and a howling wind longer than a breeze, on the same shared scale.
-  const offshore = (yFrac, dist) => {
-    const y = COAST.H * yFrac;
-    return { x: Math.min(COAST.W - 26, SHORE_X(y) + dist), y };
-  };
-
+  // The sea itself: parallel swell lines marching in the swell's travel
+  // direction. These carry the "where is it coming from" reading for the whole
+  // chart, so the ambient arrow field that used to sit over the water is gone —
+  // arrows now belong to a spot, and only appear when one is selected.
+  // Animated by translating one line-spacing along the swell's travel vector
+  // and looping — because the spacing is uniform, the loop point is invisible
+  // and the whole field reads as a swell train marching at the coast.
   let field = "";
   if (swellFrom != null) {
-    field += `<g clip-path="url(#sea-clip)">${crestField(swellFrom)}</g>`;
-    for (const f of [0.20, 0.52, 0.84]) {
-      const p = offshore(f, 66);
-      field += swellArrow(p.x, p.y, swellFrom, swellLen);
-    }
-  }
-  if (windFrom != null) {
-    for (const f of [0.36, 0.68]) {
-      const p = offshore(f, 66);
-      field += windArrow(p.x, p.y, windFrom, windLen);
-    }
+    const d = vec((swellFrom + 180) % 360);
+    field = `<g class="swell-lines" clip-path="url(#sea-clip)"
+       style="--tx:${(d.x * CREST_SPACING).toFixed(2)}px; --ty:${(d.y * CREST_SPACING).toFixed(2)}px">
+       ${crestField(swellFrom)}</g>`;
   }
 
   // Shelly through North Steyne sit within a few hundred metres of each other,
@@ -464,29 +431,32 @@ function renderChart(rows, cond, activeId) {
   // (which cluster within ~150–250 in this projection) and of the field-arrow
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
-  const ROSE = { x: 296, y: 96, r: 19 };
-  const SHIP = { x: 272, y: 322 };
-  const MONSTER = { x: 258, y: 512 };
+  const ROSE = { x: 272, y: 108, r: 20 };
+  const SHIP = { x: 258, y: 330 };
+  const SERPENT = { x: 248, y: 560 };
 
   svg.innerHTML = `
     <defs><clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath></defs>
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
       ${COAST.contours.map((d) => `<path class="depth" d="${d}"/>`).join("")}
-      <g class="chart-chrome">
-        ${rhumbLines(ROSE.x, ROSE.y, 210)}
-        ${compassRose(ROSE.x, ROSE.y, ROSE.r)}
-        ${pirateShip(SHIP.x, SHIP.y)}
-        ${seaMonster(MONSTER.x, MONSTER.y, false)}
+      <g class="chart-chrome chrome-under">
+        ${CHROME.rhumbLines(ROSE.x, ROSE.y, 620)}
       </g>
     </g>
     ${field}
+    <g class="chart-chrome" clip-path="url(#sea-clip)">
+      ${CHROME.compassRose(ROSE.x, ROSE.y, ROSE.r)}
+      ${CHROME.galleon(SHIP.x, SHIP.y, 0.66)}
+      ${CHROME.seaSerpent(SERPENT.x, SERPENT.y, 0.62, false)}
+    </g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
     ${COAST.rocks.map((d) => `<path class="rock" d="${d}"/>`).join("")}
     ${geometry.join("")}
     ${pins.join("")}
     ${labels.join("")}
+    ${tideGauge(cond, VIEW.x + 16, 108)}
   `;
 
   svg.querySelectorAll(".pin").forEach((g) => {
@@ -519,10 +489,10 @@ const legendSvg = (inner) => `<svg viewBox="0 0 34 12" aria-hidden="true">${inne
 
 function renderLegend() {
   document.getElementById("chart-legend").innerHTML = `
-    <div>${legendSvg(swellArrow(17, 6, 270, 26))} Swell — where it's heading</div>
-    <div>${legendSvg(windArrow(17, 6, 270, 24))} Wind — where it's blowing</div>
+    <div>${legendSvg(swellArrow(17, 6, 270, 26))} Swell — length shows size</div>
+    <div>${legendSvg(windArrow(17, 6, 270, 24))} Wind — length shows strength</div>
     <div>${legendSvg(`<path class="window-wedge" d="M2 11 L2 1 A10 10 0 0 1 12 11 Z"/>
-      <path class="window-edge" d="M2 11 L2 1 M2 11 L12 11"/>`)} Swell window of the active spot</div>`;
+      <path class="window-edge" d="M2 11 L2 1 M2 11 L12 11"/>`)} Pick a spot to see its arrows</div>`;
 }
 
 // ===========================================================================
@@ -583,9 +553,31 @@ const fmtDeg = (deg, compass) => (deg == null ? "n/a" : `${compass ?? ""} ${Math
 /** The buoy reports raw precision (0.768 m, 12.93 s); the surf does not. */
 const fmtNum = (v, dp = 1) => (v == null ? "—" : Number(v).toFixed(dp));
 
-function meter(label, value, weak) {
+// Wave height is stored and scored in metres (buoy Hs, matching spots.js), but
+// surfers here talk in feet, so metres never reach the screen — only this does.
+const M_TO_FT = 3.28084;
+const toFt = (m) => (m == null ? null : m * M_TO_FT);
+/** Rounded to the half-foot, the way a surf report actually reads. */
+function fmtFt(m, withUnit = true) {
+  const ft = toFt(m);
+  if (ft == null) return "—";
+  const r = Math.round(ft * 2) / 2;
+  return `${r % 1 === 0 ? r.toFixed(0) : r.toFixed(1)}${withUnit ? " ft" : ""}`;
+}
+
+/** A null value means "does not apply here" (tide at a beach with no tide
+ *  preference), which is shown as n/a rather than as a free full bar. */
+function meter(label, value) {
+  if (value == null) {
+    return `<div class="meter is-na">
+      <span class="label">${label}</span>
+      <span class="val">n/a</span>
+      <div class="track"></div>
+    </div>`;
+  }
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
-  return `<div class="meter ${weak ? "is-weak" : ""}">
+  const band = pct < 35 ? "is-bad" : pct < 65 ? "is-mid" : "is-good";
+  return `<div class="meter ${band}">
     <span class="label">${label}</span>
     <span class="val num">${pct}</span>
     <div class="track"><div class="fill" style="width:${pct}%"></div></div>
@@ -631,10 +623,12 @@ function forecastTile(spot, slot, tideModel) {
   const swellTravel = h.swellFromDeg == null ? null : (h.swellFromDeg + 180) % 360;
   const windTravel = h.windFromDeg == null ? null : (h.windFromDeg + 180) % 360;
 
-  return `<div class="fc-tile ${score.tierCls}" data-ts="${slot.ts}" data-spot="${spot.id}"
-     title="${slot.label} · ${fmtNum(h.hs, 1)} m · wind ${Math.round(h.windKmh ?? 0)} km/h · ${score.tierLabel}">
+  return `<div class="fc-tile ${score.tierCls} ${slot.past ? "is-past" : ""}"
+     data-ts="${slot.ts}" data-spot="${spot.id}"
+     title="${slot.label} · ${fmtFt(h.hs)} @ ${fmtNum(h.periodS, 0)}s · wind ${Math.round(h.windKmh ?? 0)} km/h · ${score.tierLabel}">
     <span class="fc-when">${slot.label}</span>
-    <span class="fc-hs num">${fmtNum(h.hs, 1)}</span>
+    <span class="fc-hs num">${fmtFt(h.hs, false)}<span class="fc-unit">ft</span></span>
+    <span class="fc-period num">${fmtNum(h.periodS, 0)}s</span>
     <span class="fc-arrows">
       ${swellTravel == null ? "" : `<i class="fc-arr fc-sw" style="--rot:${Math.round(swellTravel)}deg"></i>`}
       ${windTravel == null ? "" : `<i class="fc-arr fc-wd" style="--rot:${Math.round(windTravel)}deg"></i>`}
@@ -644,11 +638,7 @@ function forecastTile(spot, slot, tideModel) {
 }
 
 function forecastBar(spot, slots, tideModel) {
-  if (!slots.today.length && !slots.week.length) return "";
-
-  // Once the last of today's slots has passed, the detail strip rolls on to
-  // tomorrow — so the heading has to follow it rather than always say "Today".
-  const head = slots.today.length ? slots.today[0].dayLabel : "Today";
+  if (!slots.today.length && !slots.tomorrow.length) return "";
 
   // Every column carries a day cell, blank when it is not the first of its day.
   // Without it the labelled and unlabelled columns start at different heights.
@@ -656,17 +646,27 @@ function forecastBar(spot, slots, tideModel) {
     const first = i === 0 || arr[i - 1].day.dayKey !== s.day.dayKey;
     return `<span class="fc-day">${first ? s.day.weekday : ""}</span>`;
   };
+  const strip = (list) => list.map((s) => forecastTile(spot, s, tideModel)).join("");
 
   return `<div class="fc">
-    <div class="fc-section fc-section-today">
-      <span class="fc-head label">${head}</span>
-      <div class="fc-strip">${slots.today.map((s) => forecastTile(spot, s, tideModel)).join("")}</div>
+    <div class="fc-days">
+      <div class="fc-section">
+        <span class="fc-head label">Today</span>
+        <div class="fc-strip">${strip(slots.today)}</div>
+      </div>
+      <div class="fc-section">
+        <span class="fc-head label">Tomorrow</span>
+        <div class="fc-strip">${strip(slots.tomorrow)}</div>
+      </div>
     </div>
-    <div class="fc-section fc-section-week">
-      <span class="fc-head label">Next 7 days</span>
+    ${!slots.week.length ? "" : `
+    <button class="fc-toggle" type="button" data-week="${spot.id}" aria-expanded="false">
+      <span class="fc-toggle-mark" aria-hidden="true"></span> Rest of the week
+    </button>
+    <div class="fc-section fc-section-week" id="week-${spot.id}" hidden>
       <div class="fc-strip">${slots.week.map((s, i, arr) =>
         `<div class="fc-col">${dayCell(s, i, arr)}${forecastTile(spot, s, tideModel)}</div>`).join("")}</div>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -683,7 +683,7 @@ function renderConditions(swell, wind, tideModel, errors, tidePending) {
     ${errors.length ? `<p class="alert">${errors.join(" · ")}</p>` : ""}
     <div class="reading">
       <span class="label">Swell · SYDDOW buoy</span>
-      <div class="figure num">${fmtNum(swell.wave_height_hs_m, 2)}<span class="unit"> m</span><span class="sep">/</span>${fmtNum(swell.wave_period_tp1_s, 1)}<span class="unit"> s</span></div>
+      <div class="figure num">${fmtFt(swell.wave_height_hs_m, false)}<span class="unit"> ft</span><span class="sep">/</span>${fmtNum(swell.wave_period_tp1_s, 1)}<span class="unit"> s</span></div>
       <p class="meta">From <strong>${fmtDeg(swell.wave_direction_deg, swell.wave_direction_compass)}</strong> · ${swell.observed_at ?? "n/a"}</p>
     </div>
     <div class="reading">
@@ -696,6 +696,53 @@ function renderConditions(swell, wind, tideModel, errors, tidePending) {
       <div class="figure num">${tideFig}</div>
       <p class="meta">${tideMeta}</p>
     </div>`;
+}
+
+/**
+ * Plain-language read of what the session would actually feel like. Built from
+ * the same classifications the score uses, so it can never describe a good
+ * wave next to a "flat" badge — every clause is derived, not written.
+ */
+function surfNarrative(spot, score, cond, tideInfo) {
+  const size = {
+    flat: "Barely a ripple",
+    small: "Small, knee-to-waist stuff",
+    chest: "Waist-to-chest sets",
+    head_high: "Head-high sets",
+    overhead: "Overhead and serious",
+  }[score.sizeClass];
+
+  const period = cond.periodS == null ? ""
+    : cond.periodS >= 13 ? " on long-period ground swell, so expect real push and well-spaced sets"
+    : cond.periodS >= 10 ? " with decent spacing between sets"
+    : " on short-period windswell — close together and gutless";
+
+  const wind = score.windDir === "offshore"
+    ? (score.windLight ? "Light offshore, so faces should be clean and glassy"
+       : "Offshore wind holding the faces open")
+    : score.windLight ? "Almost no wind, so it'll be glassy whatever the direction"
+    : score.windDir === "cross" ? "Cross-shore wind putting a wobble on the face"
+    : "Onshore wind — bumpy, crumbly and disorganised";
+
+  const shape = !score.rideable
+    ? (score.inWindow ? "not enough swell getting in to work" : "the swell is out of this beach's window, so it'll be near flat")
+    : spot.kind === "reef" ? "breaking over reef, so it'll have more shape than the beachies"
+    : "shifting beach-break peaks — worth walking to find the bank";
+
+  const tide = tideInfo && tideInfo.next
+    ? ` Tide is ${tideInfo.next.type === "high" ? "pushing in" : "running out"} toward ${tideInfo.next.time_display}${
+        spot.tide_pref === "mid-high" && cond.tideState === "low"
+          ? ", and this one wants water on it — worth waiting" : ""}.`
+    : "";
+
+  const verdict = {
+    epic: " Drop everything.",
+    pumping: " Go now.",
+    ok: " Worth a look.",
+    flat: " Probably one for the coffee instead.",
+  }[score.tier];
+
+  return `${size}${period}. ${wind}, ${shape}.${tide}${verdict}`;
 }
 
 function renderVerdict(row, cond, ms, isMeasured, tideModel) {
@@ -728,10 +775,11 @@ function renderVerdict(row, cond, ms, isMeasured, tideModel) {
         ${badge(score)}
       </div>
       <p class="why">${why}</p>
+      <p class="narrative">${surfNarrative(spot, score, cond, t)}</p>
       <div class="verdict-metrics">
-        ${meter("Swell", score.swell, score.swell < 0.5)}
-        ${meter("Wind", score.wind, score.wind < 0.5)}
-        ${meter("Tide", score.tide, score.tide < 0.5)}
+        ${meter("Swell", score.swell)}
+        ${meter("Wind", score.wind)}
+        ${meter("Tide", score.tide)}
       </div>
     </article>`;
 }
@@ -766,9 +814,9 @@ function renderSheet(rows, cond, slots, tideModel) {
       <div class="spot-detail" hidden>
         <p>${spot.note}</p>
         <div class="metrics">
-          ${meter("Swell", score.swell, score.swell < 0.5)}
-          ${meter("Wind", score.wind, score.wind < 0.5)}
-          ${meter("Tide", score.tide, score.tide < 0.5)}
+          ${meter("Swell", score.swell)}
+          ${meter("Wind", score.wind)}
+          ${meter("Tide", score.tide)}
         </div>
         <div class="links">
           ${spot.surfline_url
@@ -794,6 +842,17 @@ function renderSheet(rows, cond, slots, tideModel) {
       selectSpot(li.dataset.spot, false);
     });
     btn.addEventListener("mouseenter", () => selectSpot(li.dataset.spot, false));
+  });
+
+  sheet.querySelectorAll("[data-week]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const box = document.getElementById(`week-${btn.dataset.week}`);
+      const open = !box.hidden;
+      box.hidden = open;
+      btn.setAttribute("aria-expanded", String(!open));
+      btn.classList.toggle("is-open", !open);
+    });
   });
 
   sheet.querySelectorAll("[data-wg]").forEach((btn) => {
@@ -859,6 +918,8 @@ function retime(offset) {
   STATE.hourOffset = offset;
   const { cond, ms, isMeasured } = condAt(offset);
 
+  STATE.ms = ms;
+  STATE.cond = cond;
   const rows = SPOTS.map((spot) => ({ spot, score: SCORE.scoreSpot(spot, cond) }));
   const best = rows.slice().sort(SCORE.compareScored)[0];
   const byOrder = rows.slice().sort((a, b) => a.spot.order - b.spot.order);
@@ -895,9 +956,9 @@ function updateSheetForTime(rows, cond) {
 
     const metricsEl = li.querySelector(".spot-detail .metrics");
     if (metricsEl) metricsEl.innerHTML =
-      meter("Swell", score.swell, score.swell < 0.5) +
-      meter("Wind", score.wind, score.wind < 0.5) +
-      meter("Tide", score.tide, score.tide < 0.5);
+      meter("Swell", score.swell) +
+      meter("Wind", score.wind) +
+      meter("Tide", score.tide);
   }
 }
 
@@ -966,9 +1027,23 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
   retime(STATE.hourOffset);
 }
 
+/** The page's background marginalia — an ouroboros and a serpent, sized in a
+ *  fixed viewBox so they scale with the viewport rather than being pinned to
+ *  pixel positions. Drawn once; nothing here changes with the data. */
+function renderMarginalia() {
+  const svg = document.getElementById("page-marginalia");
+  if (!svg) return;
+  svg.setAttribute("viewBox", "0 0 1000 1400");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+  svg.innerHTML = `
+    <g class="marg marg-left">${CHROME.ouroboros(140, 300, 82)}</g>
+    <g class="marg marg-right">${CHROME.seaSerpent(860, 1010, 2.1, true)}</g>`;
+}
+
 async function main() {
   for (const spot of SPOTS) spot.xy = snapToShore(project(spot.lat, spot.lng));
   wireTimeControl();
+  renderMarginalia();
 
   const swellP = fetchJson("/api/mhl");
   const windP = fetchJson("/api/wind");

@@ -65,6 +65,24 @@
 
 * { box-sizing: border-box; }
 
+/* ==========================================================================
+   Page marginalia — the creatures an old chart puts in its empty ocean.
+   Fixed behind everything, non-interactive, and faint enough to read as
+   watermark rather than illustration. Static: no animation, no filter.
+   ========================================================================== */
+.page-marginalia {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.13;
+}
+.page-marginalia .creature-body { stroke-width: 2.2; }
+body > *:not(.page-marginalia) { position: relative; z-index: 1; }
+@media (max-width: 980px) { .page-marginalia { display: none; } }
+
 body {
   margin: 0;
   background: var(--paper);
@@ -388,7 +406,8 @@ a:hover { color: var(--coffee-deep); }
 
 /* Quality = ink density on a single hue, never a traffic light.
    good = solid Coffee · ok = Coffee outline · poor = neutral Antique. */
-.pin.q-prime .dot { fill: var(--coffee); stroke: var(--coffee-deep); }
+.pin.q-epic  .dot { fill: var(--coffee-deep); stroke: var(--raisin); r: 5.5; }
+.pin.q-pumping .dot { fill: var(--coffee); stroke: var(--coffee-deep); }
 .pin.q-ok   .dot { fill: var(--coffee-wash); stroke: var(--coffee); }
 .pin.q-flat .dot { fill: var(--paper-raised); stroke: var(--antique); }
 
@@ -410,50 +429,80 @@ a:hover { color: var(--coffee-deep); }
    tick never touches this layer.
    ========================================================================== */
 
-.chart-chrome { opacity: 0.9; }
-
-.rose-spoke { stroke: var(--antique); stroke-width: 0.5; opacity: 0.55; }
-.rose-spoke-main { stroke-width: 0.75; opacity: 0.8; }
-.rose-ring { fill: none; stroke: var(--olive); stroke-width: 0.75; }
-.rose-needle { fill: var(--coffee); opacity: 0.85; }
+/* --- compass rose ------------------------------------------------------- */
+.rose-ring { fill: none; stroke: var(--olive); stroke-width: 0.6; opacity: 0.7; }
+.rose-ring-inner { stroke-width: 0.4; opacity: 0.45; }
+.rose-tick { stroke: var(--olive); stroke-width: 0.5; opacity: 0.5; }
+/* Each cardinal point is split down its spine into a lit and a shaded half —
+   the trick that makes an engraved rose read as three-dimensional. */
+.rose-pt-light { fill: var(--paper-raised); stroke: var(--olive); stroke-width: 0.4; }
+.rose-pt-dark  { fill: var(--olive); opacity: 0.85; }
+.rose-pt-minor { fill: var(--olive); opacity: 0.45; }
+.rose-hub { fill: var(--paper-raised); stroke: var(--olive); stroke-width: 0.6; }
 .rose-label {
   font-family: var(--serif);
-  font-size: 7px;
+  font-size: 8px;
+  font-weight: 600;
   fill: var(--olive);
-  opacity: 0.75;
+  letter-spacing: 0.04em;
 }
 
-.rhumb { stroke: var(--antique); stroke-width: 0.4; opacity: 0.22; stroke-dasharray: 1 3; }
+.rhumb { stroke: var(--antique); stroke-width: 0.35; opacity: 0.16; }
+.rhumb-main { stroke-width: 0.5; opacity: 0.26; }
 
-.ship-hull { fill: var(--olive); opacity: 0.85; }
-.ship-mast { stroke: var(--olive); stroke-width: 0.8; }
-.ship-sail { fill: var(--paper-raised); stroke: var(--olive); stroke-width: 0.6; opacity: 0.9; }
-.ship-sail-fore { opacity: 0.75; }
+/* --- galleon ------------------------------------------------------------ */
+.ship-hull { fill: var(--olive); opacity: 0.9; }
+.ship-hull-dark { fill: var(--raisin); opacity: 0.55; }
+.ship-spar { stroke: var(--olive); stroke-width: 1; stroke-linecap: round; }
+.ship-sail {
+  fill: var(--paper-raised);
+  stroke: var(--olive);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+.ship-line { fill: none; stroke: var(--olive); stroke-width: 0.35; opacity: 0.7; }
+.ship-flag { fill: var(--coffee); }
+.ship-wake { fill: none; stroke: var(--antique); stroke-width: 0.6; opacity: 0.5; stroke-linecap: round; }
 
-/* A gentle vaival — a ship at anchor rocking on the swell, not sailing anywhere.
-   Rotation is about the hull, not the SVG origin, so it doesn't orbit. */
-.pirate-ship { transform-origin: center; }
+/* --- sea creatures ------------------------------------------------------ */
+.creature-body {
+  fill: none;
+  stroke: var(--olive);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.creature-body-thin { stroke-width: 0.5; opacity: 0.5; }
+.creature-fill { fill: var(--olive); }
+.creature-line { fill: none; stroke: var(--olive); stroke-width: 0.7; stroke-linecap: round; }
+.creature-hatch { stroke: var(--olive); stroke-width: 0.45; opacity: 0.55; fill: none; }
+.creature-eye { fill: var(--paper-raised); }
+.sea-serpent { opacity: 0.7; }
+
+/* --- the sea itself ----------------------------------------------------- */
+/* The swell lines march along the swell's own travel vector, one line-spacing
+   per cycle so the loop is seamless. This replaced the ambient arrow field:
+   the motion carries direction for the whole chart, and arrows are reserved
+   for the spot you actually select. */
 @media (prefers-reduced-motion: no-preference) {
-  .pirate-ship { animation: ship-sway 4.2s ease-in-out infinite; }
+  .swell-lines { animation: swell-march 5.5s linear infinite; }
+  .depth { animation: water-shimmer 18s linear infinite; }
 }
-@keyframes ship-sway {
-  0%, 100% { transform: translate(var(--ox), var(--oy)) rotate(-3deg) translateY(0); }
-  50%      { transform: translate(var(--ox), var(--oy)) rotate(3deg) translateY(-1.5px); }
-}
-
-.monster-body { fill: none; stroke: var(--antique); stroke-width: 1.1; opacity: 0.55; stroke-linecap: round; }
-.monster-eye  { fill: var(--antique); opacity: 0.6; }
-.monster-fin  { fill: var(--antique); opacity: 0.45; }
-
-/* Water shimmer: the depth contours already carry a dash pattern, so marching
-   it is a stroke-dashoffset animation on lines already on screen — cheap, and
-   the only thing that needs to be "live" for the sea to read as water. */
-@media (prefers-reduced-motion: no-preference) {
-  .depth { animation: water-shimmer 14s linear infinite; }
-  .swell-crest { animation: crest-breathe 6s ease-in-out infinite; }
-}
+@keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
 @keyframes water-shimmer { to { stroke-dashoffset: -40; } }
-@keyframes crest-breathe { 0%, 100% { opacity: 0.26; } 50% { opacity: 0.14; } }
+
+/* --- tide gauge --------------------------------------------------------- */
+.tide-tube { fill: var(--paper-sunken); stroke: var(--rule-firm); stroke-width: 0.6; }
+.tide-fill { fill: var(--coffee); opacity: 0.55; transition: y 400ms ease, height 400ms ease; }
+.tide-mark { stroke: var(--coffee-deep); stroke-width: 0.9; }
+.tide-cap {
+  font-family: var(--sans);
+  font-size: 6.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  fill: var(--ink-muted);
+}
+.tide-val { font-family: var(--mono); font-size: 6.5px; fill: var(--ink-muted); }
 .shore-normal { stroke: var(--olive); stroke-width: 1; stroke-dasharray: 1.5 2.5; opacity: 0.8; }
 
 /* ==========================================================================
@@ -472,6 +521,17 @@ a:hover { color: var(--coffee-deep); }
 .verdict-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); }
 .verdict h2 { font-size: 1.875rem; line-height: 1.15; margin: var(--s1) 0 0; }
 .verdict .why { margin: var(--s3) 0 0; font-size: 1rem; color: var(--ink-body); max-width: 54ch; }
+/* The narrative read: what the session would actually feel like, in words. */
+.verdict .narrative {
+  margin: var(--s3) 0 0;
+  padding-left: var(--s3);
+  border-left: 2px solid var(--coffee-mid);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: 58ch;
+}
 
 /* Marks the verdict as reading the forecast rather than the measured buoy —
    same tag the time label wears, so the two always agree with each other. */
@@ -510,7 +570,14 @@ a:hover { color: var(--coffee-deep); }
   overflow: hidden;
 }
 .meter .fill { height: 100%; background: var(--coffee); }
-.meter.is-weak .fill { background: var(--antique); }
+/* Ink density tracks the number, so a poor score also *looks* poor rather than
+   drawing the same confident bar as a good one. */
+.meter.is-bad .fill { background: var(--antique); opacity: 0.7; }
+.meter.is-mid .fill { background: var(--coffee-mid); }
+.meter.is-good .fill { background: var(--coffee); }
+.meter.is-bad .val { color: var(--ink-muted); }
+.meter.is-na .val { color: var(--ink-muted); font-size: var(--t-small); }
+.meter.is-na .track { background: transparent; border-top: 1px dashed var(--rule); height: 0; }
 
 /* ==========================================================================
    Badges — rectangles, not pills
@@ -526,7 +593,8 @@ a:hover { color: var(--coffee-deep); }
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.badge.q-prime { background: var(--coffee); color: var(--salt); border-color: var(--coffee); }
+.badge.q-epic { background: var(--raisin); color: var(--salt); border-color: var(--raisin); }
+.badge.q-pumping { background: var(--coffee); color: var(--salt); border-color: var(--coffee); }
 .badge.q-ok   { background: transparent; color: var(--coffee); border-color: var(--coffee); }
 .badge.q-flat { background: transparent; color: var(--ink-muted); border-color: var(--rule); }
 
@@ -615,9 +683,6 @@ a:hover { color: var(--coffee-deep); }
    page-level horizontal scroll, which is the actual requirement at 375px.
    ========================================================================== */
 
-/* The two sections always stack. The bar lives inside the sheet column, which is
-   roughly 600px wide whatever the viewport does, so a viewport media query would
-   be measuring the wrong box — and side by side neither strip gets usable width. */
 .fc {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -625,6 +690,38 @@ a:hover { color: var(--coffee-deep); }
   padding: 0 var(--s5) var(--s4);
   align-items: start;
 }
+/* Today and tomorrow sit side by side — five parts each, the same shape, so the
+   two days can be compared at a glance. They collapse to one column when the
+   row is too narrow to give both a usable width. */
+/* Two five-tile strips need roughly 500px between them; below that they stack
+   rather than each getting squeezed into its own scrollbar. */
+.fc-days { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+@media (max-width: 540px) { .fc-days { grid-template-columns: 1fr; gap: var(--s3); } }
+
+/* The rest of the week is folded away behind a toggle: the two days above are
+   the decision, the week is the plan. */
+.fc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font: 600 var(--t-label) var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: none;
+  border: 0;
+  padding: var(--s1) 0;
+  cursor: pointer;
+}
+.fc-toggle:hover { color: var(--coffee); }
+.fc-toggle-mark {
+  width: 0; height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 150ms ease;
+}
+.fc-toggle.is-open .fc-toggle-mark { transform: rotate(90deg); }
 .fc-section { min-width: 0; }
 .fc-head { display: block; margin-bottom: var(--s2); }
 
@@ -671,6 +768,10 @@ a:hover { color: var(--coffee-deep); }
   white-space: nowrap;
 }
 .fc-hs { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink); }
+.fc-unit { font-size: 7px; color: var(--ink-muted); margin-left: 1px; }
+.fc-period { font-size: 8.5px; color: var(--ink-muted); font-family: var(--mono); }
+/* Hours already gone stay in place so the day reads whole, but recede. */
+.fc-tile.is-past { opacity: 0.42; }
 .fc-wind { font-size: 9px; color: var(--ink-muted); }
 
 .fc-arrows { display: flex; gap: 3px; align-items: center; height: 8px; }
@@ -687,10 +788,16 @@ a:hover { color: var(--coffee-deep); }
 .fc-wd { color: var(--olive); opacity: 0.7; }
 
 /* Same ink-density ladder as the badges: solid, outlined, muted. */
-.fc-tile.q-prime { background: var(--coffee); border-color: var(--coffee); }
-.fc-tile.q-prime .fc-hs, .fc-tile.q-prime .fc-when, .fc-tile.q-prime .fc-wind { color: var(--salt); }
-.fc-tile.q-prime .fc-sw { color: var(--salt); }
-.fc-tile.q-prime .fc-wd { color: var(--salt); opacity: 0.75; }
+.fc-tile.q-epic { background: var(--raisin); border-color: var(--raisin); }
+.fc-tile.q-epic .fc-hs, .fc-tile.q-epic .fc-when, .fc-tile.q-epic .fc-wind,
+.fc-tile.q-epic .fc-period, .fc-tile.q-epic .fc-unit { color: var(--salt); }
+.fc-tile.q-epic .fc-sw { color: var(--salt); }
+.fc-tile.q-epic .fc-wd { color: var(--salt); opacity: 0.75; }
+.fc-tile.q-pumping { background: var(--coffee); border-color: var(--coffee); }
+.fc-tile.q-pumping .fc-hs, .fc-tile.q-pumping .fc-when, .fc-tile.q-pumping .fc-wind,
+.fc-tile.q-pumping .fc-period, .fc-tile.q-pumping .fc-unit { color: var(--salt); }
+.fc-tile.q-pumping .fc-sw { color: var(--salt); }
+.fc-tile.q-pumping .fc-wd { color: var(--salt); opacity: 0.75; }
 .fc-tile.q-ok { background: var(--coffee-wash); border-color: var(--coffee-mid); }
 .fc-tile.q-flat { background: var(--paper); border-color: var(--rule-hair); }
 .fc-tile.q-flat .fc-hs { color: var(--ink-muted); }

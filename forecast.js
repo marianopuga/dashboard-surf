@@ -136,7 +136,7 @@ const FORECAST = (() => {
    * always starts at the next thing that matters.
    */
   function buildSlots(hours, nowMs, weekDays = 7) {
-    if (!hours.ok) return { today: [], week: [] };
+    if (!hours.ok) return { today: [], tomorrow: [], week: [] };
     const today = [];
 
     const todayKey = partsInTz(nowMs).dayKey;
@@ -152,26 +152,30 @@ const FORECAST = (() => {
       return { ...part, ts: h.ts, hour: h, day: h.tzParts, dayLabel };
     };
 
+    // Today keeps all five parts even once they have passed — the ones behind
+    // us are marked `past` and dimmed rather than dropped, so the day always
+    // reads as a whole day and "Today" never silently turns into tomorrow.
     for (const part of DAY_PARTS) {
       const s = slotFor(0, part);
-      if (s && s.ts + HOUR_MS >= nowMs) today.push(s);
+      if (s) today.push({ ...s, past: s.ts + HOUR_MS < nowMs });
     }
-    // If the day is nearly done, show tomorrow's dawn rather than an empty bar.
-    if (today.length === 0) {
-      for (const part of DAY_PARTS) {
-        const s = slotFor(1, part);
-        if (s) today.push(s);
-      }
+    const tomorrow = [];
+    for (const part of DAY_PARTS) {
+      const s = slotFor(1, part);
+      if (s) tomorrow.push({ ...s, past: false });
     }
 
+    // The week strip starts the day after tomorrow: today and tomorrow already
+    // have their own full five-part strips, so repeating them here would be
+    // showing the same hours twice at coarser resolution.
     const week = [];
-    for (let d = 0; d < weekDays; d++) {
+    for (let d = 2; d < weekDays; d++) {
       for (const part of WEEK_PARTS) {
         const s = slotFor(d, part);
         if (s && s.ts + HOUR_MS >= nowMs) week.push(s);
       }
     }
-    return { today, week };
+    return { today, tomorrow, week };
   }
 
   const fmtHour = (ms) => {

@@ -21,7 +21,7 @@
 </head>
 <body>
   <h1>Scoring rubric — acceptance tests</h1>
-  <p class="sub">Asserts the rubric as specified: head high/overhead + offshore = prime;
+  <p class="sub">Asserts the rubric as specified: head high/overhead + offshore = pumping;
      any rideable size with offshore or no wind = ok; everything else = flat.</p>
   <div id="summary">running…</div>
   <table><thead><tr>
@@ -40,13 +40,16 @@
     const CASES = [
       // --- the ideal condition -------------------------------------------
       { name: "Head high + offshore",
-        spot: "manly-south", expect: "prime",
+        spot: "manly-south", expect: "pumping",
         cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
-      { name: "Overhead + offshore",
-        spot: "manly-south", expect: "prime",
+      { name: "Overhead + offshore on short-period swell stays pumping",
+        spot: "manly-south", expect: "pumping",
+        cond: { hs: 2.4, periodS: 8, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
+      { name: "Overhead + offshore + long-period ground swell tops out",
+        spot: "manly-south", expect: "epic",
         cond: { hs: 2.4, periodS: 13, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
       { name: "Exactly at head-high threshold + offshore",
-        spot: "manly-south", expect: "prime",
+        spot: "manly-south", expect: "pumping",
         cond: { hs: 1.6, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
 
       // --- second best ----------------------------------------------------
@@ -91,9 +94,9 @@
         cond: { hs: 1.6, periodS: 13, swellFromDeg: 200, windFromDeg: 300, windKmh: 13, tideState: "mid" } },
 
       // --- shelter: same swell, different spots ----------------------------
-      { name: "SE swell reaches Long Reef",
-        spot: "longreef", expect: "prime",
-        cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "high" } },
+      { name: "SE swell reaches Long Reef (overhead + offshore + long period)",
+        spot: "longreef", expect: "epic",
+        cond: { hs: 2.8, periodS: 13, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "high" } },
       { name: "…but is shadowed at NE-facing Shelly",
         spot: "shelly", expect: "flat",
         cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 225, windKmh: 14, tideState: "high" } },
@@ -102,9 +105,34 @@
       { name: "Long Reef short-period windswell fails period gate",
         spot: "longreef", expect: "flat",
         cond: { hs: 2.3, periodS: 6, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "high" } },
-      { name: "Prime reef demoted at dead low tide",
+      { name: "Pumping reef demoted at dead low tide",
         spot: "longreef", expect: "ok",
         cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "low" } },
+    ];
+
+    // The breakdown has to agree with the verdict, which is the thing that was
+    // wrong before: a "flat" spot could show swell in the 70s and tide at 100.
+    const SCORE_CHECKS = [
+      { name: "Bad wind scores badly (28 km/h onshore)", expect: "wind < 15",
+        spot: "manly-south",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 80, windKmh: 28, tideState: "mid" },
+        test: (r) => r.wind * 100 < 15 },
+      { name: "Cross-shore is not half-decent", expect: "wind < 40",
+        spot: "manly-south",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 170, windFromDeg: 170, windKmh: 18, tideState: "mid" },
+        test: (r) => r.wind * 100 < 40 },
+      { name: "Swell outside the window scores badly", expect: "swell < 30",
+        spot: "manly-south",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 20, windFromDeg: 260, windKmh: 12, tideState: "mid" },
+        test: (r) => r.swell * 100 < 30 },
+      { name: "Tide reads n/a where the spot has no tide preference", expect: "tide === null",
+        spot: "manly-south",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" },
+        test: (r) => r.tide === null },
+      { name: "Offshore + in-window + good size scores high", expect: "all >= 60",
+        spot: "manly-south",
+        cond: { hs: 1.7, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 12, tideState: "mid" },
+        test: (r) => r.swell * 100 >= 60 && r.wind * 100 >= 60 },
     ];
 
     let pass = 0;
@@ -127,10 +155,28 @@
       </tr>`);
     });
 
+    SCORE_CHECKS.forEach((c, i) => {
+      const spot = byId(c.spot);
+      const r = SCORE.scoreSpot(spot, c.cond);
+      const ok = c.test(r);
+      if (ok) pass++;
+      const pct = (v) => (v == null ? "n/a" : Math.round(v * 100));
+      rows.insertAdjacentHTML("beforeend", `<tr>
+        <td>${CASES.length + i + 1}</td>
+        <td>${c.name}</td>
+        <td>${spot.short}</td>
+        <td>tier <strong>${r.tier}</strong> · swell ${pct(r.swell)} · wind ${pct(r.wind)} · tide ${pct(r.tide)}</td>
+        <td>${c.expect}</td>
+        <td>swell ${pct(r.swell)} / wind ${pct(r.wind)} / tide ${pct(r.tide)}</td>
+        <td class="${ok ? "pass" : "fail"}">${ok ? "PASS" : "FAIL"}</td>
+      </tr>`);
+    });
+
+    const total = CASES.length + SCORE_CHECKS.length;
     const s = document.getElementById("summary");
-    s.textContent = `${pass} / ${CASES.length} passing`;
-    s.className = pass === CASES.length ? "ok" : "";
-    console.log(`SCORE_TESTS ${pass}/${CASES.length}`);
+    s.textContent = `${pass} / ${total} passing`;
+    s.className = pass === total ? "ok" : "";
+    console.log(`SCORE_TESTS ${pass}/${total}`);
   </script>
 </body>
 </html>
