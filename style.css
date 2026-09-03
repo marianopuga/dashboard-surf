@@ -102,41 +102,38 @@
    with air either side of it and the colophon is short, so top-left and
    bottom-right are the two regions that stay sparse at any width — which is
    where an old chart would have put its creatures anyway. */
+/* Both creatures live in the left and right edge bands and are pushed mostly
+   off-screen, so what shows is the part that reaches in from the border — the
+   reading column is never underneath them. Below they are only ever a sliver;
+   once a real gutter opens up beside the 1180px column they slide fully into
+   it and carry more ink. */
+.marg {
+  top: 0;
+  width: clamp(150px, 20vw, 300px);
+}
 .marg-serpent {
-  left: -4vw;
-  top: 1vh;
-  width: 32vw;
-  max-width: 360px;
+  left: 0;
   aspect-ratio: 1 / 1;
   object-fit: cover;
-  /* Zoomed onto the coils; the ship and the "HIC EST HORRENDA CARIBDIS"
-     lettering sit in the upper-left of the plate and crop away. */
-  object-position: 42% 72%;
-  transform: rotate(-6deg) scale(1.08);
-  transform-origin: 35% 62%;
+  object-position: 55% 45%;   /* the coiled body, away from the caption */
+  transform: translate(-34%, -18%) rotate(-6deg);
 }
 .marg-monster {
-  right: -5vw;
-  bottom: 2vh;
-  width: 42vw;
-  max-width: 470px;
-  aspect-ratio: 700 / 173;
-  object-fit: contain;        /* a wide strip — show the whole creature */
-  transform: rotate(-4deg) scaleX(-1);
+  right: 0;
+  aspect-ratio: 874 / 734;
+  object-fit: cover;
+  object-position: 62% 60%;   /* head and coil, away from the map lettering */
+  transform: translate(34%, -18%) rotate(4deg) scaleX(-1);
 }
 body > *:not(.marginalia) { position: relative; z-index: 1; }
 
-/* Once there is a real gutter beside the 1180px column they can sit fully
-   clear of the text, so they carry more ink. */
-@media (min-width: 1320px) {
-  .marg { opacity: 0.62; }
-  .marg-serpent { left: 0.5vw; top: 6vh; }
-  .marg-monster { right: 0; bottom: 6vh; }
+/* A genuine gutter exists beyond this, so they can come fully on-page. */
+@media (min-width: 1400px) {
+  .marg { opacity: 0.6; width: clamp(200px, 15vw, 330px); }
+  .marg-serpent { transform: translate(-8%, -12%) rotate(-6deg); }
+  .marg-monster { transform: translate(8%, -12%) rotate(4deg) scaleX(-1); }
 }
-/* Narrow: they pass behind the reading column, so they step back enough to
-   stay decoration rather than interference. */
-@media (max-width: 900px) { .marg { opacity: 0.46; } }
-@media (max-width: 420px) { .marginalia { display: none; } }
+@media (max-width: 480px) { .marginalia { display: none; } }
 
 body {
   margin: 0;
@@ -496,7 +493,15 @@ a:hover { color: var(--coffee-deep); }
    scan's own paper into the parchment, so no alpha cutting is needed: on a
    light ground the white paper multiplies to nothing and only the ink shows.
    A touch of sepia + contrast pulls their colour toward the page palette. */
-.plate { filter: url(#ink-stamp); }
+.plate {
+  filter: url(#ink-stamp);
+  /* Same edge treatment as the marginalia: these are crops out of a larger
+     plate, so without a soft edge the crop boundary reads as a pasted box. */
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%,
+    #000 55%, rgba(0,0,0,0.6) 78%, transparent 94%);
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%,
+    #000 55%, rgba(0,0,0,0.6) 78%, transparent 94%);
+}
 .plate-rose { opacity: 0.7; }
 .plate-ship { opacity: 0.85; }
 .plate-monster { opacity: 0.7; }

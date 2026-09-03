@@ -33,6 +33,34 @@ const CHROME = (() => {
       preserveAspectRatio="xMidYMid meet"/>`;
   }
 
+  let cropSeq = 0;
+  /**
+   * Draw one region of a larger plate, centred on (cx,cy) at `destW` wide.
+   *
+   * The compass rose and the galleon both live inside a single treasure-map
+   * image, so rather than saving cropped copies the source is scaled up and
+   * clipped to the wanted rectangle — one file stays the source of truth, and
+   * a crop is retuned by changing four numbers instead of re-exporting.
+   *
+   * `crop` is in fractions of the source (0-1): {x, y, w, h}.
+   */
+  function plateCrop(href, srcW, srcH, crop, cx, cy, destW, cls) {
+    const id = `crop-${cls}-${cropSeq++}`;
+    const destH = destW * ((crop.h * srcH) / (crop.w * srcW));
+    // Scale the whole source so the crop region fills the destination box,
+    // then offset it so the region's top-left lands on the box's top-left.
+    const scale = destW / (crop.w * srcW);
+    const fullW = srcW * scale, fullH = srcH * scale;
+    const x0 = cx - destW / 2, y0 = cy - destH / 2;
+    return `<clipPath id="${id}">
+        <rect x="${n(x0)}" y="${n(y0)}" width="${n(destW)}" height="${n(destH)}"/>
+      </clipPath>
+      <image class="plate plate-${cls}" href="${href}" clip-path="url(#${id})"
+        x="${n(x0 - crop.x * fullW)}" y="${n(y0 - crop.y * fullH)}"
+        width="${n(fullW)}" height="${n(fullH)}"
+        preserveAspectRatio="none"/>`;
+  }
+
   /**
    * A 16-point wind rose. The eight ordinal points sit under the four cardinal
    * ones, each point split into a light and a dark half down its spine so it
@@ -232,5 +260,5 @@ const CHROME = (() => {
     </g>`;
   }
 
-  return { plate, compassRose, rhumbLines, galleon, seaSerpent, ouroboros };
+  return { plate, plateCrop, compassRose, rhumbLines, galleon, seaSerpent, ouroboros };
 })();

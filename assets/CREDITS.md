@@ -1,15 +1,21 @@
 # Chart artwork
 
-All public domain, sourced from Wikimedia Commons. These are the decorative
-elements on the coast chart and the page background.
+Supplied by the project owner. The compass rose and the galleon are cropped
+out of `treasure-map.webp` at render time (see `CHROME.plateCrop` in
+chrome.js) rather than being saved as separate files, so there is one source
+of truth per image.
 
-| File | Source | Date | Licence |
-|---|---|---|---|
-| `compass-rose-bowen-1747.jpg` | Emanuel Bowen, *Mariner's Compass and Armillary Sphere* | 1747 | Public domain |
-| `ship-blaeu-1617.jpg` | Willem Blaeu, *Asia noviter delineata* (ship detail) | 1617 | Public domain |
-| `serpent-carta-marina-1539.jpg` | Olaus Magnus, *Carta Marina* (sea serpent detail) | 1539 | Public domain |
-| `monster-munster-1544.jpg` | Sebastian Münster, *Thier* (sea monster detail, monster only) | 1544 | Public domain |
+| File | Used for | Where |
+|---|---|---|
+| `treasure-map.webp` | compass rose + galleon, cropped from the plate | coast chart |
+| `sea-monster.webp` | lone sea monster, antique map detail | page marginalia |
+| `sea-serpent.webp` | sea serpent | page marginalia |
+| `ouroboros.webp` | serpent taking its tail | page marginalia |
 
-All four are pre-1900 engravings whose copyright has long expired. They are
-composited onto the parchment with `mix-blend-mode: multiply`, which drops
-their own paper background into the chart's without needing alpha cutouts.
+Each is composited through the `#ink-stamp` SVG filter, which pushes contrast,
+forces the ink flat to the palette olive and sets alpha to (1 - luminance), so
+the paper drops out and only the linework survives. A radial mask then softens
+the plate edge so nothing reads as a pasted rectangle.
+
+Crops are also chosen to exclude the screenshot UI overlays present in the
+bottom-right of some of the source files.

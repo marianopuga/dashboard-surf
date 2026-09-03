@@ -1,4 +1,4 @@
-// Northern Beaches spots, ordered south → north (Shelly Beach to Long Reef).
+// Northern Beaches spots, ordered south → north (Manly to Long Reef).
 // lat/lng are anchored to the OSM `natural=beach` features of the same name, so each
 // pin lands on the actual shoreline; app.js then snaps it to the nearest point on the
 // coastline path in coast.js. (The earlier hand-estimated coordinates sat up to ~900 m
@@ -9,8 +9,8 @@
 // exposure = fraction of the open-ocean swell that actually reaches this spot when
 //   the direction is ideal — headland shelter, bay geometry and refraction. It is what
 //   makes the displayed wave height differ between spots on one shared swell: the buoy
-//   reads one number for the whole coast, but Shelly behind North Head does not see the
-//   same wave as Long Reef. Rough local knowledge, not measured.
+//   reads one number for the whole coast, but a beach behind a headland does not see
+//   the same wave as an exposed reef. Rough local knowledge, not measured.
 // size_ref_m = the buoy Hs at which THIS spot is head high / overhead. Note the units: like
 //   good_size_m these are buoy readings, not breaking-wave face height, which is why a
 //   sheltered bay and an exposed reef reach "head high" at very different numbers. Seeded at
@@ -22,22 +22,6 @@
 // beach is sheltered by the headlands around it — NOT measured data, and not a
 // substitute for checking the spot yourself. Treat the ranking as a starting point.
 const SPOTS = [
-  {
-    id: "shelly", name: "Shelly Beach", short: "Shelly", order: 1, kind: "beach",
-    lat: -33.8005, lng: 151.2979, facing_deg: 45,
-    swell_window: [20, 90], min_period_s: 0, good_size_m: [0.3, 1.5], size_ref_m: { head_high: 1.0, overhead: 1.3 }, exposure: 0.3, tide_pref: null,
-    note: "A very sheltered bay behind North Head. Needs NE swell to get in; with S/SE swell it's nearly flat. A good call in strong S/SW wind, since the headland blocks it.",
-    surfline_url: "https://www.surfline.com/surf-report/shelly-beach-manly/584204204e65fad6a77092fd",
-    windguru_id: "208682",
-  },
-  {
-    id: "fairybower", name: "Fairy Bower", short: "Fairy Bower", order: 2, kind: "reef",
-    lat: -33.7997, lng: 151.2952, facing_deg: 55,
-    swell_window: [25, 100], min_period_s: 9, good_size_m: [0.5, 2], size_ref_m: { head_high: 1.3, overhead: 1.7 }, exposure: 0.45, tide_pref: "mid-high",
-    note: "A right-hand point next to Shelly, breaking over rock. Best with some tide (not dry) and NE-E swell with long period. No dedicated Surfline page.",
-    surfline_url: null,
-    windguru_id: "208682",
-  },
   {
     id: "manly-south", name: "Manly (South Steyne)", short: "Manly S", order: 3, kind: "beach",
     lat: -33.7985, lng: 151.2887, facing_deg: 80,

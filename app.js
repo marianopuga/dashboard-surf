@@ -58,9 +58,9 @@ const COAST_PTS = COAST.coast
  *
  * The move is capped: the coordinates are already good (they come from OSM's
  * own beach features), so this is a nudge of a few pixels, not a relocation.
- * Uncapped, Fairy Bower — tucked inside Cabbage Tree Bay, where "nearest point
- * on the coastline" is not a meaningful idea — jumped 119 m and swapped places
- * with Shelly, putting the map out of geographic order.
+ * Uncapped, a spot tucked inside a bay — where "nearest point on the
+ * coastline" is not a meaningful idea — can jump over 100 m and swap places
+ * with its neighbour, putting the map out of geographic order.
  */
 function snapToShore(p, maxMove = 6) {
   let best = { d: Infinity, x: p.x, y: p.y };
@@ -99,7 +99,8 @@ const SHORE_X = (() => {
 // Reading the conditions against a beach
 //
 // A raw bearing tells you nothing on its own — 110° is a dream at Long Reef and
-// a flat day at Shelly. What matters is the bearing *relative to the beach*, so
+// a flat day in a north-facing bay. What matters is the bearing *relative to
+// the beach*, so
 // everything below is expressed in that frame and given a plain-language name.
 // ===========================================================================
 
@@ -381,7 +382,7 @@ function renderChart(rows, cond, activeId) {
        ${crestField(swellFrom)}</g>`;
   }
 
-  // Shelly through North Steyne sit within a few hundred metres of each other,
+  // South and North Steyne sit within a few hundred metres of each other,
   // so their labels would overlap. Walk them north to south and push each one
   // clear of the last — the leader line is implied by the label's own offset.
   // Walk in authored north-to-south order (`order` runs south to north) rather
@@ -448,7 +449,7 @@ function renderChart(rows, cond, activeId) {
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
   const ROSE = { x: 272, y: 108, r: 20 };
-  const SHIP = { x: 243, y: 318 };
+  const SHIP = { x: 262, y: 352 };
   const SERPENT = { x: 248, y: 560 };
 
   svg.innerHTML = `
@@ -462,8 +463,10 @@ function renderChart(rows, cond, activeId) {
     </g>
     ${field}
     <g class="chart-chrome" clip-path="url(#sea-clip)">
-      ${CHROME.plate("assets/compass-rose-bowen-1747.jpg", ROSE.x, ROSE.y, 74, "rose")}
-      ${CHROME.plate("assets/ship-blaeu-1617.jpg", SHIP.x, SHIP.y, 144, "ship", 768 / 864)}
+      ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
+        { x: 0.21, y: 0.50, w: 0.15, h: 0.20 }, ROSE.x, ROSE.y, 78, "rose")}
+      ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
+        { x: 0.35, y: 0.44, w: 0.225, h: 0.37 }, SHIP.x, SHIP.y, 120, "ship")}
     </g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
@@ -801,6 +804,10 @@ function renderVerdict(row, cond, ms, isMeasured, tideModel) {
 
 function renderSheet(rows, cond, slots, tideModel) {
   const sheet = document.getElementById("sheet");
+  // Derived from the data rather than written into the markup, so removing or
+  // adding a spot can never leave the heading claiming the wrong count.
+  const heading = document.getElementById("sheet-heading");
+  if (heading) heading.textContent = `All ${rows.length} spots, south to north`;
   sheet.querySelectorAll(".spot").forEach((n) => n.remove());
 
   sheet.insertAdjacentHTML("beforeend", rows.map(({ spot, score }) => {

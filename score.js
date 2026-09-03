@@ -152,8 +152,8 @@ function windowFit(spot, cond) {
  *
  * The buoy publishes one number for the entire coast and the forecast model
  * resolves the whole strip as a single grid cell, so without this every spot
- * displayed an identical height — which is plainly wrong: Shelly sits behind
- * North Head and does not see the wave Long Reef does. Two factors reduce it:
+ * displayed an identical height — which is plainly wrong: a beach tucked behind
+ * a headland does not see the wave an exposed reef does. Two factors reduce it:
  * the spot's standing `exposure` (shelter and refraction) and how squarely
  * the swell is aimed into its window today.
  *
@@ -230,8 +230,8 @@ function scoreSpot(spot, cond) {
   const reaches = miss <= WINDOW_SHOULDER_DEG;
 
   // Size is what arrives at THIS beach, not what the open ocean is doing. A
-  // swell 65° outside Shelly's window was being reported as "chest high"
-  // there purely because the buoy read 0.8 m — the bay is in shadow and the
+  // swell well outside a spot's window was being reported as "chest high"
+  // there purely because the buoy read 0.8 m — the beach is in shadow and the
   // honest answer is flat, which is also what the narrative should say.
   const sizeClass = reaches ? classifySize(spot, cond.hs) : "flat";
   const periodOK = !spot.min_period_s || (cond.periodS != null && cond.periodS >= spot.min_period_s);

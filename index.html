@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Northern Beaches — Shelly to Long Reef</title>
-  <meta name="description" content="Swell, wind and tide conditions across the spots between Shelly Beach and Long Reef, from measured MHL and BOM data." />
+  <title>Northern Beaches — Manly to Long Reef</title>
+  <meta name="description" content="Swell, wind and tide conditions across the spots between Manly and Long Reef, from measured MHL and BOM data." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -28,10 +28,13 @@
          own alpha for the same reason. -->
     <filter id="ink-stamp" x="0" y="0" width="100%" height="100%"
             color-interpolation-filters="sRGB">
+      <!-- Threshold sits near 0.42 luminance: the treasure-map parchment is a
+           mid brown (~0.55), far darker than white paper, so a gentler curve
+           left it partly opaque and every plate showed as a box. -->
       <feComponentTransfer>
-        <feFuncR type="linear" slope="1.9" intercept="-0.45"/>
-        <feFuncG type="linear" slope="1.9" intercept="-0.45"/>
-        <feFuncB type="linear" slope="1.9" intercept="-0.45"/>
+        <feFuncR type="linear" slope="3" intercept="-0.8"/>
+        <feFuncG type="linear" slope="3" intercept="-0.8"/>
+        <feFuncB type="linear" slope="3" intercept="-0.8"/>
       </feComponentTransfer>
       <feColorMatrix type="matrix" values="
         0 0 0 0 0.27
@@ -50,13 +53,13 @@
        object-position so only the creature shows — the Münster plate has a ship
        in its right half, so it is framed to the monster alone. -->
   <div class="marginalia" aria-hidden="true">
-    <img class="marg marg-serpent" src="assets/serpent-carta-marina-1539.jpg" alt="" />
-    <img class="marg marg-monster" src="assets/monster-munster-1544.jpg" alt="" />
+    <img class="marg marg-serpent" src="assets/sea-serpent.webp" alt="" />
+    <img class="marg marg-monster" src="assets/sea-monster.webp" alt="" />
   </div>
 
   <header class="masthead wrap">
     <p class="kicker label">Sydney · Northern Beaches</p>
-    <h1>Shelly Beach to Long Reef</h1>
+    <h1>Manly to Long Reef</h1>
     <p class="sub">Swell measured at the SYDDOW buoy · wind and tide from the Bureau of Meteorology</p>
   </header>
 
@@ -97,7 +100,7 @@
 
     <div>
       <div id="verdict"></div>
-      <h2 class="label" style="margin-bottom: var(--s3)">All eleven spots, south to north</h2>
+      <h2 class="label" id="sheet-heading" style="margin-bottom: var(--s3)">The spots, south to north</h2>
       <ol class="sheet" id="sheet">
         <li class="sheet-head label" aria-hidden="true">
           <span>Spot</span><span>Swell</span><span>Wind</span><span>Rating</span>
