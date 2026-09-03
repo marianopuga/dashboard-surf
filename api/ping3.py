@@ -4,9 +4,12 @@ endpoints. Isolates generic outbound-network breakage from MHL/BOM
 specifically blocking Vercel's egress IPs. Also reports the egress IP
 itself, so we can check it against MHL/BOM.
 """
+import os
+import sys
 from http.server import BaseHTTPRequestHandler
 
-from _lib import fetch_json, json_response, error_response
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _lib import fetch_json, json_response, error_response  # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
