@@ -464,9 +464,9 @@ function renderChart(rows, cond, activeId) {
     ${field}
     <g class="chart-chrome" clip-path="url(#sea-clip)">
       ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
-        { x: 0.21, y: 0.50, w: 0.15, h: 0.20 }, ROSE.x, ROSE.y, 78, "rose")}
+        { x: 0.233, y: 0.532, w: 0.107, h: 0.146 }, ROSE.x, ROSE.y, 74, "rose")}
       ${CHROME.plateCrop("assets/treasure-map.webp", 1028, 752,
-        { x: 0.35, y: 0.44, w: 0.225, h: 0.37 }, SHIP.x, SHIP.y, 120, "ship")}
+        { x: 0.372, y: 0.452, w: 0.192, h: 0.335 }, SHIP.x, SHIP.y, 124, "ship")}
     </g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
