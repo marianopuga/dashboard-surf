@@ -13,20 +13,9 @@ function vec(bearing) {
   return { x: Math.sin(bearing * RAD), y: -Math.cos(bearing * RAD) };
 }
 
-/** Smallest angle between two bearings, 0–180. */
-function angleDiff(a, b) {
-  if (a == null || b == null) return null;
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-}
-
-/** Is `bearing` inside the arc that runs clockwise from `a0` to `a1`? */
-function inArc(bearing, a0, a1) {
-  if (bearing == null) return false;
-  const span = (a1 - a0 + 360) % 360;
-  const off = (bearing - a0 + 360) % 360;
-  return off <= span;
-}
+// angleDiff() and inArc() are defined in score.js, which loads first: the scoring
+// engine needs them and has to stay loadable on its own (test.html loads it
+// without app.js), so it owns them and they are in scope here already.
 
 function project(lat, lng) {
   return {
@@ -98,8 +87,10 @@ const SHORE_X = (() => {
 function readSwell(spot, swellFrom) {
   if (swellFrom == null) return { text: "no data", inc: null, lit: false };
   const inc = angleDiff(swellFrom, spot.facing_deg);
-  const lit = inArc(swellFrom, spot.swell_window[0], spot.swell_window[1]);
-  if (!lit) return { text: "outside window", inc, lit };
+  const miss = SCORE.arcMiss(swellFrom, spot.swell_window[0], spot.swell_window[1]);
+  const lit = miss <= SCORE.WINDOW_SHOULDER_DEG; // matches the engine's rideability gate
+  if (miss > SCORE.WINDOW_SHOULDER_DEG) return { text: "outside window", inc, lit };
+  if (miss > 0) return { text: "edge of window", inc, lit };
   if (inc < 25) return { text: "straight in", inc, lit };
   if (inc < 55) return { text: "somewhat cross", inc, lit };
   return { text: "very cross", inc, lit };
@@ -109,7 +100,7 @@ function readSwell(spot, swellFrom) {
 function readWind(spot, windFrom, kmh) {
   if (windFrom == null) return { text: "no data", rel: null };
   const rel = angleDiff(windFrom, (spot.facing_deg + 180) % 360);
-  if (kmh != null && kmh < 8) return { text: "calm", rel };
+  if (kmh != null && kmh < SCORE.LIGHT_WIND_KMH) return { text: "calm", rel };
   let text;
   if (rel < 45) text = "offshore";
   else if (rel < 80) text = "cross-offshore";
@@ -120,58 +111,36 @@ function readWind(spot, windFrom, kmh) {
 }
 
 // ===========================================================================
-// Scoring (unchanged model, sub-scores exposed so the meters can show them)
+// Scoring adapters
+//
+// The rubric itself lives in score.js. These two helpers only translate the
+// wire formats into the engine's neutral `cond` shape, so measured buoy data
+// and modelled forecast data score through exactly the same code path.
 // ===========================================================================
 
-function triangularScore(v, [lo, hi]) {
-  if (v == null) return 0.5;
-  const mid = (lo + hi) / 2;
-  if (v >= lo && v <= hi) return 1 - (0.3 * Math.abs(v - mid)) / ((hi - lo) / 2 || 1);
-  const dist = v < lo ? lo - v : v - hi;
-  return Math.max(0, 1 - dist / (hi - lo || 1));
+/** Measured now: MHL buoy + BOM wind + interpolated tide state. */
+function condFromMeasured(swell, wind, tideNow) {
+  return {
+    hs: swell.wave_height_hs_m ?? null,
+    periodS: swell.wave_period_tp1_s ?? null,
+    swellFromDeg: swell.wave_direction_deg ?? null,
+    windFromDeg: wind.wind_dir_deg ?? null,
+    windKmh: wind.wind_speed_kmh ?? null,
+    tideState: tideNow ? tideNow.state : null,
+  };
 }
 
-function windScoreFor(facingDeg, windDeg, speedKmh) {
-  if (windDeg == null) return 0.5;
-  const diff = angleDiff(windDeg, (facingDeg + 180) % 360);
-  let base = 1 - diff / 180;
-  if (speedKmh != null && speedKmh < 8) base = Math.max(base, 0.7);
-  if (speedKmh != null && speedKmh > 20 && diff > 120) base = Math.min(base, 0.15);
-  return Math.max(0, Math.min(1, base));
-}
-
-function scoreSpot(spot, swell, wind, tide) {
-  const [dmin, dmax] = spot.swell_window;
-  const center = (dmin + dmax) / 2;
-  const halfWidth = (dmax - dmin) / 2;
-  const dirDiff = angleDiff(swell.wave_direction_deg, center) ?? 90;
-  const dirScore = Math.max(0, 1 - dirDiff / (halfWidth + 40));
-
-  const sizeScore = triangularScore(swell.wave_height_hs_m, spot.good_size_m);
-  const periodOK = spot.min_period_s
-    ? (swell.wave_period_tp1_s >= spot.min_period_s ? 1 : 0.4)
-    : 1;
-  const windScore = windScoreFor(spot.facing_deg, wind.wind_dir_deg, wind.wind_speed_kmh);
-
-  let tideScore = 1;
-  if (spot.tide_pref === "mid-high" && tide && tide.state) {
-    tideScore = tide.state === "low" ? 0.4 : tide.state === "rising-from-low" ? 0.7 : 1;
-  }
-
-  const total = (dirScore * 0.3 + sizeScore * 0.25 + windScore * 0.3 + tideScore * 0.15) * periodOK;
-  return { total, dirScore, sizeScore, windScore, tideScore, periodOK };
-}
-
-/**
- * Quality is expressed as ink density on one hue, not as a traffic light:
- * solid Coffee = worth the drive, outlined Coffee = it'll do, neutral Antique =
- * ignore it. Red/amber/green borrows a hazard metaphor from a domain that does
- * not apply here, and it dies in greyscale.
- */
-function quality(total) {
-  if (total >= 0.72) return { text: "Very good", cls: "q-good" };
-  if (total >= 0.5) return { text: "OK", cls: "q-ok" };
-  return { text: "Poor", cls: "q-poor" };
+/** One hour of the Open-Meteo forecast series. */
+function condFromForecast(hour, tideState) {
+  if (!hour) return null;
+  return {
+    hs: hour.hs ?? null,
+    periodS: hour.periodS ?? null,
+    swellFromDeg: hour.swellFromDeg ?? null,
+    windFromDeg: hour.windFromDeg ?? null,
+    windKmh: hour.windKmh ?? null,
+    tideState: tideState ?? null,
+  };
 }
 
 function tideStateNow(tide) {
@@ -341,7 +310,7 @@ function renderChart(rows, swell, wind, activeId) {
   // Split into two layers: the active spot's geometry sits under every pin, so
   // a wedge can never cover a neighbouring dot.
   const geometry = [];
-  const pins = rows.map(({ spot, q }) => {
+  const pins = rows.map(({ spot, score }) => {
     const p = spot.xy;
     const isActive = spot.id === activeId;
     if (isActive) {
@@ -366,7 +335,7 @@ function renderChart(rows, swell, wind, activeId) {
           : ""
       );
     }
-    return `<g class="pin ${q.cls} ${isActive ? "is-active" : ""}" data-spot="${spot.id}"
+    return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""}" data-spot="${spot.id}"
               transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})">
         <circle class="halo" r="9"/>
         <circle class="dot" r="4.5"/>
@@ -472,6 +441,9 @@ function dial(spot, swellFrom, windFrom) {
 
 const fmtDeg = (deg, compass) => (deg == null ? "n/a" : `${compass ?? ""} ${Math.round(deg)}°`.trim());
 
+/** The buoy reports raw precision (0.768 m, 12.93 s); the surf does not. */
+const fmtNum = (v, dp = 1) => (v == null ? "—" : Number(v).toFixed(dp));
+
 function meter(label, value, weak) {
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   return `<div class="meter ${weak ? "is-weak" : ""}">
@@ -479,6 +451,24 @@ function meter(label, value, weak) {
     <span class="val num">${pct}</span>
     <div class="track"><div class="fill" style="width:${pct}%"></div></div>
   </div>`;
+}
+
+/**
+ * Tier badge. Carries the rating on three independent channels — fill/ink,
+ * glyph shape, and the word itself — so it never depends on hue alone:
+ *   prime  filled diamond   ok  half-filled circle   flat  open dash
+ */
+const TIER_GLYPH = {
+  prime: '<path d="M5 0 L10 5 L5 10 L0 5 Z"/>',
+  ok: '<path d="M5 0 A5 5 0 0 1 5 10 Z"/><circle cx="5" cy="5" r="4.4" fill="none" stroke-width="1.2"/>',
+  flat: '<rect x="0.5" y="4.2" width="9" height="1.6" rx="0.8"/>',
+};
+
+function badge(score) {
+  return `<span class="badge ${score.tierCls}">
+    <svg class="tier-glyph" viewBox="0 0 10 10" aria-hidden="true">${TIER_GLYPH[score.tier]}</svg>
+    ${score.tierLabel}
+  </span>`;
 }
 
 function renderConditions(swell, wind, tide, errors, tidePending) {
@@ -494,7 +484,7 @@ function renderConditions(swell, wind, tide, errors, tidePending) {
     ${errors.length ? `<p class="alert">${errors.join(" · ")}</p>` : ""}
     <div class="reading">
       <span class="label">Swell · SYDDOW buoy</span>
-      <div class="figure num">${swell.wave_height_hs_m ?? "—"}<span class="unit"> m</span><span class="sep">/</span>${swell.wave_period_tp1_s ?? "—"}<span class="unit"> s</span></div>
+      <div class="figure num">${fmtNum(swell.wave_height_hs_m, 2)}<span class="unit"> m</span><span class="sep">/</span>${fmtNum(swell.wave_period_tp1_s, 1)}<span class="unit"> s</span></div>
       <p class="meta">From <strong>${fmtDeg(swell.wave_direction_deg, swell.wave_direction_compass)}</strong> · ${swell.observed_at ?? "n/a"}</p>
     </div>
     <div class="reading">
@@ -510,7 +500,7 @@ function renderConditions(swell, wind, tide, errors, tidePending) {
 }
 
 function renderVerdict(row, swell, wind, tide) {
-  const { spot, score, q } = row;
+  const { spot, score } = row;
   const sw = readSwell(spot, swell.wave_direction_deg);
   const wd = readWind(spot, wind.wind_dir_deg, wind.wind_speed_kmh);
   const t = tideStateNow(tide);
@@ -532,13 +522,13 @@ function renderVerdict(row, swell, wind, tide) {
           <span class="label">Best bet today</span>
           <h2>${spot.name}</h2>
         </div>
-        <span class="badge ${q.cls}">${q.text}</span>
+        ${badge(score)}
       </div>
       <p class="why">${why}</p>
       <div class="verdict-metrics">
-        ${meter("Direction", score.dirScore, score.dirScore < 0.5)}
-        ${meter("Size", score.sizeScore, score.sizeScore < 0.5)}
-        ${meter("Wind", score.windScore, score.windScore < 0.5)}
+        ${meter("Swell", score.swell, score.swell < 0.5)}
+        ${meter("Wind", score.wind, score.wind < 0.5)}
+        ${meter("Tide", score.tide, score.tide < 0.5)}
       </div>
     </article>`;
 }
@@ -548,7 +538,7 @@ function renderSheet(rows, swell, wind) {
   sheet.querySelectorAll(".spot").forEach((n) => n.remove());
   const swellFrom = swell.wave_direction_deg, windFrom = wind.wind_dir_deg;
 
-  sheet.insertAdjacentHTML("beforeend", rows.map(({ spot, score, q }) => {
+  sheet.insertAdjacentHTML("beforeend", rows.map(({ spot, score }) => {
     const sw = readSwell(spot, swellFrom);
     const wd = readWind(spot, windFrom, wind.wind_speed_kmh);
     return `<li class="spot" id="spot-${spot.id}" data-spot="${spot.id}">
@@ -568,15 +558,14 @@ function renderSheet(rows, swell, wind) {
           <span class="v">${wd.text}</span>
           <span class="d">${wd.rel != null ? `${Math.round(wd.rel)}° off offshore` : "n/a"}</span>
         </span>
-        <span class="badge ${q.cls}">${q.text}</span>
+        ${badge(score)}
       </button>
       <div class="spot-detail" hidden>
         <p>${spot.note}</p>
         <div class="metrics">
-          ${meter("Direction", score.dirScore, score.dirScore < 0.5)}
-          ${meter("Size", score.sizeScore, score.sizeScore < 0.5)}
-          ${meter("Wind", score.windScore, score.windScore < 0.5)}
-          ${meter("Tide", score.tideScore, score.tideScore < 0.5)}
+          ${meter("Swell", score.swell, score.swell < 0.5)}
+          ${meter("Wind", score.wind, score.wind < 0.5)}
+          ${meter("Tide", score.tide, score.tide < 0.5)}
         </div>
         <div class="links">
           ${spot.surfline_url
@@ -644,12 +633,11 @@ function render(swell, wind, tide, errors, tidePending) {
   renderConditions(swell, wind, tide, errors, tidePending);
 
   const tideNow = tideStateNow(tide);
-  const rows = SPOTS.map((spot) => {
-    const score = scoreSpot(spot, swell, wind, tideNow);
-    return { spot, score, q: quality(score.total) };
-  });
+  const cond = condFromMeasured(swell, wind, tideNow);
+  const rows = SPOTS.map((spot) => ({ spot, score: SCORE.scoreSpot(spot, cond) }));
 
-  const best = rows.slice().sort((a, b) => b.score.total - a.score.total)[0];
+  // Tier first, then the continuous score within the tier.
+  const best = rows.slice().sort(SCORE.compareScored)[0];
   const byOrder = rows.slice().sort((a, b) => a.spot.order - b.spot.order);
 
   // Keep whatever the reader was looking at across the tide re-render.

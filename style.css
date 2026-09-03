@@ -270,9 +270,9 @@ a:hover { color: var(--coffee-deep); }
 
 /* Quality = ink density on a single hue, never a traffic light.
    good = solid Coffee · ok = Coffee outline · poor = neutral Antique. */
-.pin.q-good .dot { fill: var(--coffee); stroke: var(--coffee-deep); }
+.pin.q-prime .dot { fill: var(--coffee); stroke: var(--coffee-deep); }
 .pin.q-ok   .dot { fill: var(--coffee-wash); stroke: var(--coffee); }
-.pin.q-poor .dot { fill: var(--paper-raised); stroke: var(--antique); }
+.pin.q-flat .dot { fill: var(--paper-raised); stroke: var(--antique); }
 
 .chart-plate .name.is-active { fill: var(--ink); }
 .pin.is-active .halo { opacity: 1; }
@@ -339,9 +339,15 @@ a:hover { color: var(--coffee-deep); }
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.badge.q-good { background: var(--coffee); color: var(--salt); border-color: var(--coffee); }
+.badge.q-prime { background: var(--coffee); color: var(--salt); border-color: var(--coffee); }
 .badge.q-ok   { background: transparent; color: var(--coffee); border-color: var(--coffee); }
-.badge.q-poor { background: transparent; color: var(--ink-muted); border-color: var(--rule); }
+.badge.q-flat { background: transparent; color: var(--ink-muted); border-color: var(--rule); }
+
+/* The glyph carries the rating independently of hue: a filled diamond, a
+   half-filled circle and an open dash are distinguishable in greyscale and to
+   a colour-blind reader even before the word is read. */
+.badge { display: inline-flex; align-items: center; gap: var(--s1); }
+.tier-glyph { width: 9px; height: 9px; flex: none; fill: currentColor; stroke: currentColor; }
 
 /* ==========================================================================
    Spot sheet — one sheet of paper with hairline dividers, not 11 floating cards

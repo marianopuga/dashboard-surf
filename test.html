@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scoring rubric tests</title>
+  <style>
+    body { font: 14px ui-monospace, Menlo, monospace; background: #F1EBE4; color: #2E2F23;
+           margin: 0; padding: 24px; }
+    h1 { font: 600 18px system-ui; margin: 0 0 4px; }
+    p.sub { color: #6B6754; margin: 0 0 20px; font: 13px system-ui; }
+    table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #DFD8CC; }
+    th { font: 600 11px system-ui; text-transform: uppercase; letter-spacing: .08em; color: #6B6754; }
+    .pass { color: #464831; font-weight: 600; }
+    .fail { color: #734E30; font-weight: 600; }
+    #summary { margin: 20px 0; padding: 12px 16px; border-left: 3px solid #734E30;
+               background: #FAF7F3; font: 600 15px system-ui; }
+    #summary.ok { border-left-color: #464831; }
+  </style>
+</head>
+<body>
+  <h1>Scoring rubric — acceptance tests</h1>
+  <p class="sub">Asserts the rubric as specified: head high/overhead + offshore = prime;
+     any rideable size with offshore or no wind = ok; everything else = flat.</p>
+  <div id="summary">running…</div>
+  <table><thead><tr>
+    <th>#</th><th>Case</th><th>Spot</th><th>Conditions</th><th>Expected</th><th>Actual</th><th>Result</th>
+  </tr></thead><tbody id="rows"></tbody></table>
+
+  <script src="spots.js"></script>
+  <script src="score.js"></script>
+  <script>
+    const byId = (id) => SPOTS.find((s) => s.id === id);
+
+    // Manly South: faces 80°, window 50–140°, good 0.5–2.5, head high 1.6, overhead 2.1.
+    //   offshore wind comes FROM 260°. No tide preference.
+    // Long Reef: faces 120°, window 90–170°, head high 2.1, min period 10s,
+    //   tide_pref mid-high. Offshore is FROM 300°.
+    const CASES = [
+      // --- the ideal condition -------------------------------------------
+      { name: "Head high + offshore",
+        spot: "manly-south", expect: "prime",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
+      { name: "Overhead + offshore",
+        spot: "manly-south", expect: "prime",
+        cond: { hs: 2.4, periodS: 13, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
+      { name: "Exactly at head-high threshold + offshore",
+        spot: "manly-south", expect: "prime",
+        cond: { hs: 1.6, periodS: 12, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
+
+      // --- second best ----------------------------------------------------
+      { name: "Small but rideable + offshore",
+        spot: "manly-south", expect: "ok",
+        cond: { hs: 0.8, periodS: 10, swellFromDeg: 95, windFromDeg: 260, windKmh: 14, tideState: "mid" } },
+      { name: "Head high but glassy (no wind, 4 km/h)",
+        spot: "manly-south", expect: "ok",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 90, windKmh: 4, tideState: "mid" } },
+      { name: "Small + no wind",
+        spot: "manly-south", expect: "ok",
+        cond: { hs: 0.8, periodS: 10, swellFromDeg: 95, windFromDeg: 90, windKmh: 3, tideState: "mid" } },
+
+      // --- the 10 km/h boundary -------------------------------------------
+      { name: "Onshore at 9 km/h counts as no wind",
+        spot: "manly-south", expect: "ok",
+        cond: { hs: 1.0, periodS: 10, swellFromDeg: 95, windFromDeg: 80, windKmh: 9, tideState: "mid" } },
+      { name: "Same onshore at 11 km/h does not",
+        spot: "manly-south", expect: "flat",
+        cond: { hs: 1.0, periodS: 10, swellFromDeg: 95, windFromDeg: 80, windKmh: 11, tideState: "mid" } },
+
+      // --- bad cases -------------------------------------------------------
+      { name: "Head high but blown out onshore",
+        spot: "manly-south", expect: "flat",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 80, windKmh: 28, tideState: "mid" } },
+      { name: "Cross-shore 18 km/h",
+        spot: "manly-south", expect: "flat",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 95, windFromDeg: 170, windKmh: 18, tideState: "mid" } },
+      { name: "Flat: below the spot's minimum",
+        spot: "manly-south", expect: "flat",
+        cond: { hs: 0.2, periodS: 10, swellFromDeg: 95, windFromDeg: 260, windKmh: 12, tideState: "mid" } },
+      { name: "Swell outside the spot's window",
+        spot: "manly-south", expect: "flat",
+        cond: { hs: 1.8, periodS: 12, swellFromDeg: 20, windFromDeg: 260, windKmh: 12, tideState: "mid" } },
+
+      // --- soft window edge -------------------------------------------------
+      { name: "2° past the window edge still reaches (shoulder)",
+        spot: "longreef", expect: "ok",
+        cond: { hs: 1.6, periodS: 13, swellFromDeg: 172, windFromDeg: 300, windKmh: 13, tideState: "mid" } },
+      { name: "30° past the window edge does not",
+        spot: "longreef", expect: "flat",
+        cond: { hs: 1.6, periodS: 13, swellFromDeg: 200, windFromDeg: 300, windKmh: 13, tideState: "mid" } },
+
+      // --- shelter: same swell, different spots ----------------------------
+      { name: "SE swell reaches Long Reef",
+        spot: "longreef", expect: "prime",
+        cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "high" } },
+      { name: "…but is shadowed at NE-facing Shelly",
+        spot: "shelly", expect: "flat",
+        cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 225, windKmh: 14, tideState: "high" } },
+
+      // --- period gate and tide -------------------------------------------
+      { name: "Long Reef short-period windswell fails period gate",
+        spot: "longreef", expect: "flat",
+        cond: { hs: 2.3, periodS: 6, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "high" } },
+      { name: "Prime reef demoted at dead low tide",
+        spot: "longreef", expect: "ok",
+        cond: { hs: 2.3, periodS: 13, swellFromDeg: 140, windFromDeg: 300, windKmh: 14, tideState: "low" } },
+    ];
+
+    let pass = 0;
+    const rows = document.getElementById("rows");
+    CASES.forEach((c, i) => {
+      const spot = byId(c.spot);
+      const r = SCORE.scoreSpot(spot, c.cond);
+      const ok = r.tier === c.expect;
+      if (ok) pass++;
+      const cd = c.cond;
+      rows.insertAdjacentHTML("beforeend", `<tr>
+        <td>${i + 1}</td>
+        <td>${c.name}</td>
+        <td>${spot.short}</td>
+        <td>${cd.hs}m ${cd.periodS}s from ${cd.swellFromDeg}° ·
+            wind ${cd.windKmh}km/h from ${cd.windFromDeg}° · tide ${cd.tideState}</td>
+        <td>${c.expect}</td>
+        <td>${r.tier} <span style="color:#6B6754">(${r.sizeLabel}, ${r.windDir}${r.windLight ? ", light" : ""})</span></td>
+        <td class="${ok ? "pass" : "fail"}">${ok ? "PASS" : "FAIL"}</td>
+      </tr>`);
+    });
+
+    const s = document.getElementById("summary");
+    s.textContent = `${pass} / ${CASES.length} passing`;
+    s.className = pass === CASES.length ? "ok" : "";
+    console.log(`SCORE_TESTS ${pass}/${CASES.length}`);
+  </script>
+</body>
+</html>
