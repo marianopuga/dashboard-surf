@@ -47,15 +47,7 @@ const SPOTS = [
     windguru_id: "208682",
   },
   {
-    id: "deadmans", name: "Deadman's", short: "Deadman's", order: 6, kind: "reef",
-    lat: -33.7848, lng: 151.2889, facing_deg: 95,
-    swell_window: [70, 150], min_period_s: 11, good_size_m: [1, 3], size_ref_m: { head_high: 2.1, overhead: 2.6 }, exposure: 0.9, tide_pref: "mid-high",
-    note: "Reef at the northern end of Queenscliff. Needs more size/period than the neighbouring beaches; very low tide leaves it exposed and dangerous.",
-    surfline_url: "https://www.surfline.com/surf-report/deadmans/60f8644556831fd384ac4e6d",
-    windguru_id: "208682",
-  },
-  {
-    id: "freshwater", name: "Freshwater", short: "Freshwater", order: 7, kind: "beach",
+    id: "freshwater", name: "Freshwater", short: "Freshwater", order: 6, kind: "beach",
     lat: -33.7821, lng: 151.2912, facing_deg: 90,
     swell_window: [60, 150], min_period_s: 0, good_size_m: [0.5, 2.5], size_ref_m: { head_high: 1.6, overhead: 2.1 }, exposure: 0.92, tide_pref: null,
     note: "One of the most consistent beachbreaks in the area, fairly exposed to E-SE.",
@@ -63,7 +55,7 @@ const SPOTS = [
     windguru_id: "208683",
   },
   {
-    id: "curlcurl-south", name: "Curl Curl South", short: "Curl Curl S", order: 8, kind: "beach",
+    id: "curlcurl-south", name: "Curl Curl South", short: "Curl Curl S", order: 7, kind: "beach",
     lat: -33.7724, lng: 151.2955, facing_deg: 95,
     swell_window: [65, 155], min_period_s: 0, good_size_m: [0.5, 2.5], size_ref_m: { head_high: 1.6, overhead: 2.1 }, exposure: 0.95, tide_pref: null,
     note: "Southern end of Curl Curl, separated from the north by the lagoon. Surfline treats it as one spot with the north; in practice they break similarly.",
@@ -71,7 +63,7 @@ const SPOTS = [
     windguru_id: "208683",
   },
   {
-    id: "curlcurl-north", name: "Curl Curl North", short: "Curl Curl N", order: 9, kind: "beach",
+    id: "curlcurl-north", name: "Curl Curl North", short: "Curl Curl N", order: 8, kind: "beach",
     lat: -33.7676, lng: 151.2979, facing_deg: 95,
     swell_window: [65, 155], min_period_s: 0, good_size_m: [0.5, 2.5], size_ref_m: { head_high: 1.6, overhead: 2.1 }, exposure: 0.97, tide_pref: null,
     note: "Northern end of Curl Curl. Shares a Surfline spot with the south; conditions are very similar in practice.",
@@ -79,7 +71,7 @@ const SPOTS = [
     windguru_id: "208683",
   },
   {
-    id: "deewhy", name: "Dee Why", short: "Dee Why", order: 10, kind: "beach",
+    id: "deewhy", name: "Dee Why", short: "Dee Why", order: 9, kind: "beach",
     lat: -33.7522, lng: 151.2995, facing_deg: 100,
     swell_window: [70, 160], min_period_s: 0, good_size_m: [0.5, 2.5], size_ref_m: { head_high: 1.6, overhead: 2.1 }, exposure: 0.97, tide_pref: null,
     note: "Open beach plus Dee Why Point (reef) at the northern end, which needs more SE swell.",
@@ -87,7 +79,7 @@ const SPOTS = [
     windguru_id: "208683",
   },
   {
-    id: "longreef", name: "Long Reef", short: "Long Reef", order: 11, kind: "reef",
+    id: "longreef", name: "Long Reef", short: "Long Reef", order: 10, kind: "reef",
     lat: -33.7443, lng: 151.3091, facing_deg: 120,
     swell_window: [90, 170], min_period_s: 10, good_size_m: [1, 3], size_ref_m: { head_high: 2.1, overhead: 2.6 }, exposure: 1.0, tide_pref: "mid-high",
     note: "The most S/SE-exposed spot in the whole stretch: works with swells more southerly than anywhere else. Reef, take care at very low tide.",
