@@ -147,6 +147,26 @@ function windowFit(spot, cond) {
   return Math.max(0, 0.5 - 0.5 * ((miss - WINDOW_SHOULDER_DEG) / 40));
 }
 
+/**
+ * The wave height actually arriving at THIS spot, in metres.
+ *
+ * The buoy publishes one number for the entire coast and the forecast model
+ * resolves the whole strip as a single grid cell, so without this every spot
+ * displayed an identical height — which is plainly wrong: Shelly sits behind
+ * North Head and does not see the wave Long Reef does. Two factors reduce it:
+ * the spot's standing `exposure` (shelter and refraction) and how squarely
+ * the swell is aimed into its window today.
+ *
+ * Scoring still classifies against the per-spot buoy-referenced thresholds —
+ * those already encode each spot's character — so this is what gets shown,
+ * not a second, competing rubric.
+ */
+function hsAtSpot(spot, cond) {
+  if (cond.hs == null) return null;
+  const shelter = spot.exposure ?? 1;
+  return cond.hs * shelter * windowFit(spot, cond);
+}
+
 /** Direction and size multiply rather than average: a perfect size in a swell
  *  the beach cannot see is still nothing, and the number should say so. */
 function swellContribution(spot, cond) {
@@ -252,6 +272,7 @@ function scoreSpot(spot, cond) {
     tierRank: tier.rank,
     sizeClass,
     sizeLabel: SIZE_LABEL[sizeClass],
+    hsAtSpot: hsAtSpot(spot, cond),
     windDir: wind.dir,
     windLight: wind.light,
     windRel: wind.rel,
@@ -281,6 +302,7 @@ const SCORE = {
   inArc,
   arcMiss,
   windowFit,
+  hsAtSpot,
   clamp01,
   WINDOW_SHOULDER_DEG,
   classifySize,

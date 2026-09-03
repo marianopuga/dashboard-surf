@@ -436,6 +436,17 @@ a:hover { color: var(--coffee-deep); }
    tick never touches this layer.
    ========================================================================== */
 
+/* --- scanned engravings ------------------------------------------------- */
+/* Real public-domain plates (see assets/CREDITS.md). `multiply` drops each
+   scan's own paper into the parchment, so no alpha cutting is needed: on a
+   light ground the white paper multiplies to nothing and only the ink shows.
+   A touch of sepia + contrast pulls their colour toward the page palette. */
+.plate { filter: url(#ink-stamp); }
+.plate-rose { opacity: 0.7; }
+.plate-ship { opacity: 0.85; }
+.plate-monster { opacity: 0.7; }
+.plate-marg { opacity: 1; }
+
 /* --- compass rose ------------------------------------------------------- */
 .rose-ring { fill: none; stroke: var(--olive); stroke-width: 0.6; opacity: 0.7; }
 .rose-ring-inner { stroke-width: 0.4; opacity: 0.45; }

@@ -15,6 +15,25 @@ const CHROME = (() => {
   const n = (v) => Number(v).toFixed(1);
 
   /**
+   * Drop a scanned engraving onto the chart, centred on (cx,cy) and `w` units
+   * wide. These are real public-domain plates (see assets/CREDITS.md), not
+   * drawings — a 1747 Bowen compass, a 1617 Blaeu ship, 16th-century sea
+   * monsters.
+   *
+   * Each scan carries its own paper background. Rather than cut alpha masks,
+   * they are composited with `mix-blend-mode: multiply`: on a light parchment
+   * the white-ish paper multiplies away to nothing and only the ink survives,
+   * which is both closer to how the originals sat on a real chart and far
+   * cheaper than masking four raster files.
+   */
+  function plate(href, cx, cy, w, cls, aspect = 1) {
+    const h = w * aspect;
+    return `<image class="plate plate-${cls}" href="${href}"
+      x="${n(cx - w / 2)}" y="${n(cy - h / 2)}" width="${n(w)}" height="${n(h)}"
+      preserveAspectRatio="xMidYMid meet"/>`;
+  }
+
+  /**
    * A 16-point wind rose. The eight ordinal points sit under the four cardinal
    * ones, each point split into a light and a dark half down its spine so it
    * reads as engraved relief the way a real rose does — that shading is what
@@ -213,5 +232,5 @@ const CHROME = (() => {
     </g>`;
   }
 
-  return { compassRose, rhumbLines, galleon, seaSerpent, ouroboros };
+  return { plate, compassRose, rhumbLines, galleon, seaSerpent, ouroboros };
 })();

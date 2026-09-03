@@ -462,8 +462,8 @@ function renderChart(rows, cond, activeId) {
     </g>
     ${field}
     <g class="chart-chrome" clip-path="url(#sea-clip)">
-      ${CHROME.compassRose(ROSE.x, ROSE.y, ROSE.r)}
-      ${CHROME.galleon(SHIP.x, SHIP.y, 0.66)}
+      ${CHROME.plate("assets/compass-rose-bowen-1747.jpg", ROSE.x, ROSE.y, 74, "rose")}
+      ${CHROME.plate("assets/ship-blaeu-1617.jpg", SHIP.x, SHIP.y, 72, "ship", 768 / 864)}
       ${CHROME.seaSerpent(SERPENT.x, SERPENT.y, 0.62, false)}
     </g>
     <path class="land" d="${LAND_PATH}"/>
@@ -641,9 +641,9 @@ function forecastTile(spot, slot, tideModel) {
 
   return `<div class="fc-tile ${score.tierCls} ${slot.past ? "is-past" : ""}"
      data-ts="${slot.ts}" data-spot="${spot.id}"
-     title="${slot.label} · ${fmtFt(h.hs)} @ ${fmtNum(h.periodS, 0)}s · wind ${Math.round(h.windKmh ?? 0)} km/h · ${score.tierLabel}">
+     title="${slot.label} · ${fmtFt(score.hsAtSpot)} at ${spot.short} @ ${fmtNum(h.periodS, 0)}s · wind ${Math.round(h.windKmh ?? 0)} km/h · ${score.tierLabel}">
     <span class="fc-when">${slot.label}</span>
-    <span class="fc-hs num">${fmtFt(h.hs, false)}<span class="fc-unit">ft</span></span>
+    <span class="fc-hs num">${fmtFt(score.hsAtSpot, false)}<span class="fc-unit">ft</span></span>
     <span class="fc-period num">${fmtNum(h.periodS, 0)}s</span>
     <span class="fc-arrows">
       ${swellTravel == null ? "" : `<i class="fc-arr fc-sw" style="--rot:${Math.round(swellTravel)}deg"></i>`}
@@ -1052,8 +1052,8 @@ function renderMarginalia() {
   svg.setAttribute("viewBox", "0 0 1000 1400");
   svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
   svg.innerHTML = `
-    <g class="marg marg-left">${CHROME.ouroboros(140, 300, 82)}</g>
-    <g class="marg marg-right">${CHROME.seaSerpent(860, 1010, 2.1, true)}</g>`;
+    ${CHROME.plate("assets/serpent-carta-marina-1539.jpg", 150, 320, 300, "marg", 375 / 425)}
+    ${CHROME.plate("assets/monster-munster-1544.jpg", 850, 1040, 360, "marg", 276 / 467)}`;
 }
 
 async function main() {
