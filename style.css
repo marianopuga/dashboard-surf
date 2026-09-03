@@ -1,0 +1,192 @@
+:root {
+  --bg: #0b1a24;
+  --panel: #10222e;
+  --panel-2: #142a38;
+  --text: #e7f1f5;
+  --muted: #93a9b3;
+  --good: #37b76a;
+  --ok: #d9a441;
+  --poor: #d95b41;
+  --accent: #4fb3d9;
+  --border: #1e3a48;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(180deg, var(--bg), #081319);
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.page-header {
+  padding: 20px 20px 10px;
+  text-align: center;
+}
+.page-header h1 { margin: 0 0 6px; font-size: 1.5rem; }
+.best-banner {
+  display: inline-block;
+  background: var(--good);
+  color: #04220f;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin: 0;
+}
+
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  padding: 12px 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.status-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+.status-label { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 3px; }
+.status-value { font-weight: 600; }
+.status-error { background: #3a1a14; border-color: #6b3020; color: #ffb199; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  max-width: 1100px;
+  margin: 10px auto;
+  padding: 0 20px;
+}
+@media (max-width: 780px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.map-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  position: sticky;
+  top: 10px;
+  align-self: start;
+}
+.map-svg { width: 100%; height: auto; display: block; }
+.map-hint { color: var(--muted); font-size: 0.75rem; text-align: center; margin: 8px 0 0; }
+
+.coast-line {
+  fill: none;
+  stroke: #2c5468;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+.map-dot circle {
+  fill: var(--muted);
+  stroke: var(--bg);
+  stroke-width: 2;
+  cursor: pointer;
+}
+.map-dot text {
+  fill: var(--text);
+  font-size: 8px;
+  cursor: pointer;
+}
+.map-dot.good circle { fill: var(--good); }
+.map-dot.ok circle { fill: var(--ok); }
+.map-dot.poor circle { fill: var(--poor); }
+.map-dot.best circle { stroke: #ffe27a; stroke-width: 3; r: 9; }
+
+.spot-list { display: flex; flex-direction: column; gap: 12px; }
+
+.spot-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--muted);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.spot-card.good { border-left-color: var(--good); }
+.spot-card.ok { border-left-color: var(--ok); }
+.spot-card.poor { border-left-color: var(--poor); }
+.spot-card.best { background: var(--panel-2); box-shadow: 0 0 0 1px var(--accent); }
+
+.spot-card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.spot-card h3 { margin: 0; font-size: 1.02rem; }
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #04140a;
+  white-space: nowrap;
+}
+.badge.good { background: var(--good); }
+.badge.ok { background: var(--ok); }
+.badge.poor { background: var(--poor); color: #200a04; }
+
+.spot-arrows {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.arrow { width: 16px; height: 16px; }
+.arrow.swell { fill: var(--accent); }
+.arrow.wind { fill: #f2a65a; }
+
+.spot-note { margin: 6px 0 10px; font-size: 0.88rem; color: #cdd9de; }
+
+.spot-links {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+.spot-links a { color: var(--accent); }
+.spot-links .muted { color: var(--muted); }
+.toggle-windguru {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.toggle-windguru:hover { border-color: var(--accent); }
+
+.windguru-embed { margin-top: 10px; }
+.windguru-disclaimer {
+  background: #3a2a14;
+  border: 1px solid #6b4f20;
+  color: #ffd699;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+.windguru-embed iframe {
+  width: 100%;
+  height: 380px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.page-footer {
+  max-width: 900px;
+  margin: 30px auto 40px;
+  padding: 0 20px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}

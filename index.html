@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Northern Beaches Surf</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>🌊 Northern Beaches — Shelly a Long Reef</h1>
+    <p id="best-banner" class="best-banner">Cargando…</p>
+  </header>
+
+  <section id="status-bar" class="status-bar">Cargando datos de MHL, BOM y marea…</section>
+
+  <main class="layout">
+    <div class="map-panel">
+      <svg id="map-svg" class="map-svg"></svg>
+      <p class="map-hint">Tocá un punto para ir al detalle del spot.</p>
+    </div>
+
+    <div id="spot-list" class="spot-list">Cargando spots…</div>
+  </main>
+
+  <footer class="page-footer">
+    <p>
+      Oleaje: <strong>Manly Hydraulics Laboratory</strong>, boya real frente a Sydney (SYDDOW) — dato medido, no modelo.
+      Viento y marea: <strong>Bureau of Meteorology</strong> (North Head / Fort Denison), en vivo.
+      Interpretación por spot: link directo a <strong>Surfline</strong> (su API no es pública y bloquea el acceso automatizado, así que no se puede embeber).
+      Viento detallado: <strong>Windguru</strong>, versión gratuita — su pronóstico viene con atraso, marcado en cada spot, y no se usa para el ranking.
+    </p>
+  </footer>
+
+  <script src="spots.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
