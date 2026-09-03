@@ -1,37 +1,79 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Northern Beaches Surf</title>
+  <title>Northern Beaches — Shelly to Long Reef</title>
+  <meta name="description" content="Swell, wind and tide conditions across the spots between Shelly Beach and Long Reef, from measured MHL and BOM data." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="page-header">
-    <h1>🌊 Northern Beaches — Shelly a Long Reef</h1>
-    <p id="best-banner" class="best-banner">Cargando…</p>
+
+  <header class="masthead wrap">
+    <p class="kicker label">Sydney · Northern Beaches</p>
+    <h1>Shelly Beach to Long Reef</h1>
+    <p class="sub">Swell measured at the SYDDOW buoy · wind and tide from the Bureau of Meteorology</p>
   </header>
 
-  <section id="status-bar" class="status-bar">Cargando datos de MHL, BOM y marea…</section>
+  <div class="wrap">
+    <hr class="rule-double" />
+    <section id="conditions" class="conditions" aria-label="Current conditions"></section>
+  </div>
 
-  <main class="layout">
-    <div class="map-panel">
-      <svg id="map-svg" class="map-svg"></svg>
-      <p class="map-hint">Tocá un punto para ir al detalle del spot.</p>
+  <main class="wrap layout">
+    <div class="chart-panel">
+      <div class="chart-plate">
+        <div class="chart-head">
+          <h2>The coast right now</h2>
+          <span class="label" id="chart-active">—</span>
+        </div>
+        <div class="chart-canvas">
+          <svg id="chart" preserveAspectRatio="xMidYMid meet" role="img"
+               aria-label="Chart of the coast showing swell and wind direction"></svg>
+        </div>
+        <div class="chart-legend" id="chart-legend"></div>
+      </div>
     </div>
 
-    <div id="spot-list" class="spot-list">Cargando spots…</div>
+    <div>
+      <div id="verdict"></div>
+      <h2 class="label" style="margin-bottom: var(--s3)">All eleven spots, south to north</h2>
+      <ol class="sheet" id="sheet">
+        <li class="sheet-head label" aria-hidden="true">
+          <span>Spot</span><span>Swell</span><span>Wind</span><span>Rating</span>
+        </li>
+      </ol>
+    </div>
   </main>
 
-  <footer class="page-footer">
-    <p>
-      Oleaje: <strong>Manly Hydraulics Laboratory</strong>, boya real frente a Sydney (SYDDOW) — dato medido, no modelo.
-      Viento y marea: <strong>Bureau of Meteorology</strong> (North Head / Fort Denison), en vivo.
-      Interpretación por spot: link directo a <strong>Surfline</strong> (su API no es pública y bloquea el acceso automatizado, así que no se puede embeber).
-      Viento detallado: <strong>Windguru</strong>, versión gratuita — su pronóstico viene con atraso, marcado en cada spot, y no se usa para el ranking.
-    </p>
+  <footer class="colophon wrap">
+    <dl>
+      <div>
+        <dt class="label">Swell</dt>
+        <dd>Manly Hydraulics Laboratory — Waverider buoy SYDDOW off Sydney. Measured data, not modelled.</dd>
+      </div>
+      <div>
+        <dt class="label">Wind and tide</dt>
+        <dd>Bureau of Meteorology — North Head station and Fort Denison tides, live.</dd>
+      </div>
+      <div>
+        <dt class="label">Coastline</dt>
+        <dd>OpenStreetMap (ODbL), simplified and drawn right here. No map library.</dd>
+      </div>
+      <div>
+        <dt class="label">Per-spot interpretation</dt>
+        <dd>Direct link to Surfline. Windguru's forecast lags and doesn't feed the ranking.</dd>
+      </div>
+    </dl>
   </footer>
 
+  <script src="coast.js"></script>
   <script src="spots.js"></script>
   <script src="app.js"></script>
 </body>

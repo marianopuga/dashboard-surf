@@ -107,9 +107,9 @@ def get_tide_events():
         "source": "Bureau of Meteorology – National Tide Tables",
         "source_url": "https://www.bom.gov.au/australia/tides/",
         "note": (
-            "Fort Denison es la referencia oficial de mareas de Sydney. "
-            "El horario de pleamar/bajamar es prácticamente el mismo en "
-            "las playas oceánicas cercanas; la altura puede variar levemente."
+            "Fort Denison is Sydney's official tide reference. "
+            "High/low tide timing is virtually the same at nearby ocean "
+            "beaches; the height can vary slightly."
         ),
     }
 
