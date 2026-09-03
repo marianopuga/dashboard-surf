@@ -448,7 +448,7 @@ function renderChart(rows, cond, activeId) {
   // (which cluster within ~150–250 in this projection) and of the field-arrow
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
-  const ROSE = { x: 272, y: 108, r: 20 };
+  const ROSE = { x: 266, y: 566, r: 20 };
   const SHIP = { x: 262, y: 352 };
   const SERPENT = { x: 248, y: 560 };
 

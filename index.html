@@ -46,6 +46,28 @@
       </feComponentTransfer>
       <feComposite in="deepened" in2="SourceGraphic" operator="in"/>
     </filter>
+
+    <!-- Same idea, pushed harder, for the plates that sit ON the chart: a
+         darker ink (Raisin rather than Olive) and a lower alpha gamma, so the
+         rose and the galleon read as struck onto the paper rather than as a
+         faint watermark. The marginalia keep the softer stamp above. -->
+    <filter id="ink-stamp-strong" x="0" y="0" width="100%" height="100%"
+            color-interpolation-filters="sRGB">
+      <feComponentTransfer>
+        <feFuncR type="linear" slope="3.2" intercept="-0.85"/>
+        <feFuncG type="linear" slope="3.2" intercept="-0.85"/>
+        <feFuncB type="linear" slope="3.2" intercept="-0.85"/>
+      </feComponentTransfer>
+      <feColorMatrix type="matrix" values="
+        0 0 0 0 0.13
+        0 0 0 0 0.14
+        0 0 0 0 0.10
+        -0.34 -0.34 -0.34 0 1" result="stamped"/>
+      <feComponentTransfer in="stamped" result="deepened">
+        <feFuncA type="gamma" exponent="0.5"/>
+      </feComponentTransfer>
+      <feComposite in="deepened" in2="SourceGraphic" operator="in"/>
+    </filter>
   </svg>
 
   <!-- Marginalia: the creatures an old chart puts in its empty ocean. Anchored
