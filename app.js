@@ -30,8 +30,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * a physically exact one, and a clamped linear scale keeps light and violent
  * days both legible instead of one making the other invisible.
  */
-const lenForSwell = (hs) => hs == null ? 34 : clamp(16 + ((hs - 0.3) / 2.2) * 40, 16, 58);
-const lenForWind = (kmh) => kmh == null ? 30 : clamp(14 + (kmh / 35) * 38, 14, 54);
+const lenForSwell = (hs) => hs == null ? 66 : clamp(32 + ((hs - 0.3) / 2.2) * 78, 32, 112);
+const lenForWind = (kmh) => kmh == null ? 58 : clamp(28 + (kmh / 35) * 74, 28, 104);
 
 // angleDiff() and inArc() are defined in score.js, which loads first: the scoring
 // engine needs them and has to stay loadable on its own (test.html loads it
@@ -216,7 +216,7 @@ function arrowTo(x1, y1, x2, y2, k, filled, cased) {
   const dx = x2 - x1, dy = y2 - y1;
   const L = Math.hypot(dx, dy) || 1;
   const ux = dx / L, uy = dy / L;
-  const h = Math.min(9, L * 0.42);
+  const h = Math.min(18, L * 0.42);
 
   let shaftD, headD;
   if (filled) {
@@ -280,18 +280,33 @@ const LAND_PATH = `${COAST.coast} L${GUTTER - 60} -60 L${GUTTER - 60} ${COAST.H 
 const SEA_PATH = `${COAST.coast} L${COAST.W + 60} -60 L${COAST.W + 60} ${COAST.H + 60} Z`;
 
 const CREST_SPACING = 26;
+/** How many line-spacings the field travels per animation cycle. Must match
+ *  the opacity-pattern length below or the loop will visibly jump. */
+const CREST_CYCLE = 3;
 
-/** Parallel swell crest lines — the wave train, marching at the coast. */
+/**
+ * Parallel swell crest lines — the wave train, marching at the coast.
+ *
+ * The lines deliberately are NOT uniform. A perfectly even set of parallel
+ * lines translated by exactly one spacing is pixel-identical to where it
+ * started, so the motion is literally imperceptible — there is no feature to
+ * track. Varying weight and opacity on a 3-line cycle gives the eye something
+ * to follow, and translating a whole 3-line cycle keeps the loop seamless.
+ */
 function crestField(from) {
   const t = (from + 180) % 360;
   const d = vec(t);
   const p = { x: -d.y, y: d.x };
   const cx = COAST.W / 2, cy = COAST.H / 2;
-  const reach = Math.hypot(COAST.W, COAST.H) * 1.2;
+  const reach = Math.hypot(COAST.W, COAST.H) * 1.4;
+  const span = Math.ceil(reach / CREST_SPACING);
   let out = "";
-  for (let k = -Math.ceil(reach / 2 / CREST_SPACING); k <= Math.ceil(reach / 2 / CREST_SPACING); k++) {
+  for (let k = -span; k <= span; k++) {
     const ax = cx + d.x * k * CREST_SPACING, ay = cy + d.y * k * CREST_SPACING;
-    out += `<line class="swell-crest" x1="${(ax - p.x * reach).toFixed(1)}" y1="${(ay - p.y * reach).toFixed(1)}"
+    // ((k % 3) + 3) % 3 keeps the phase stable through negative k.
+    const phase = ((k % CREST_CYCLE) + CREST_CYCLE) % CREST_CYCLE;
+    out += `<line class="swell-crest crest-${phase}"
+      x1="${(ax - p.x * reach).toFixed(1)}" y1="${(ay - p.y * reach).toFixed(1)}"
       x2="${(ax + p.x * reach).toFixed(1)}" y2="${(ay + p.y * reach).toFixed(1)}"/>`;
   }
   return out;
@@ -360,8 +375,9 @@ function renderChart(rows, cond, activeId) {
   let field = "";
   if (swellFrom != null) {
     const d = vec((swellFrom + 180) % 360);
+    const dist = CREST_SPACING * CREST_CYCLE;
     field = `<g class="swell-lines" clip-path="url(#sea-clip)"
-       style="--tx:${(d.x * CREST_SPACING).toFixed(2)}px; --ty:${(d.y * CREST_SPACING).toFixed(2)}px">
+       style="--tx:${(d.x * dist).toFixed(2)}px; --ty:${(d.y * dist).toFixed(2)}px">
        ${crestField(swellFrom)}</g>`;
   }
 
@@ -404,10 +420,10 @@ function renderChart(rows, cond, activeId) {
         // are told apart by colour as well as by shaft style even this close
         // together. Both scale with the same energy the field arrows use.
         swellFrom != null
-          ? swellArrow(p.x + vec(swellFrom).x * 62, p.y + vec(swellFrom).y * 62, swellFrom, swellLen)
+          ? swellArrow(p.x + vec(swellFrom).x * 86, p.y + vec(swellFrom).y * 86, swellFrom, swellLen)
           : "",
         windFrom != null
-          ? windArrow(p.x + vec(windFrom).x * 40, p.y + vec(windFrom).y * 40, windFrom, windLen)
+          ? windArrow(p.x + vec(windFrom).x * 62, p.y + vec(windFrom).y * 62, windFrom, windLen)
           : ""
       );
     }

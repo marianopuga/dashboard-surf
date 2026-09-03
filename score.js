@@ -203,23 +203,31 @@ const TIERS = {
  * Returns the tier plus the three contributions the UI shows permanently.
  */
 function scoreSpot(spot, cond) {
-  const sizeClass = classifySize(spot, cond.hs);
   const wind = classifyWind(spot, cond.windFromDeg, cond.windKmh);
 
   const miss = arcMiss(cond.swellFromDeg, spot.swell_window[0], spot.swell_window[1]);
   const inWindow = miss === 0;
   const reaches = miss <= WINDOW_SHOULDER_DEG;
+
+  // Size is what arrives at THIS beach, not what the open ocean is doing. A
+  // swell 65° outside Shelly's window was being reported as "chest high"
+  // there purely because the buoy read 0.8 m — the bay is in shadow and the
+  // honest answer is flat, which is also what the narrative should say.
+  const sizeClass = reaches ? classifySize(spot, cond.hs) : "flat";
   const periodOK = !spot.min_period_s || (cond.periodS != null && cond.periodS >= spot.min_period_s);
   const rideable = reaches && sizeClass !== "flat" && periodOK;
 
   const swell = swellContribution(spot, cond);
   const windScore = windContribution(spot, cond);
   const tide = tideContribution(spot, cond);
-  // Tide only enters the weighted total where it actually applies, otherwise
-  // its weight is redistributed instead of being filled with a free 1.0.
-  const total = tide == null
-    ? swell * 0.55 + windScore * 0.45
-    : swell * 0.45 + windScore * 0.4 + tide * 0.15;
+
+  // Swell GATES the total rather than contributing a share of it. As a weighted
+  // sum, a spot with literally zero swell reaching it still scored in the
+  // forties on the strength of a perfect offshore wind — but flawless wind on a
+  // flat ocean is still a flat ocean. Multiplying means no swell, no score,
+  // while wind and tide still separate the spots that do have something.
+  const conditions = tide == null ? windScore : windScore * 0.75 + tide * 0.25;
+  const total = swell * (0.45 + 0.55 * conditions);
 
   // Long-period ground swell is what separates a big day from a great one.
   const groundSwell = cond.periodS != null && cond.periodS >= 11;

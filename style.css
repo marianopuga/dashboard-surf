@@ -45,8 +45,8 @@
   --t-title:   1.5rem;      /* 24 */
   --t-card:    1.125rem;    /* 18 */
   --t-body:    0.9375rem;   /* 15 */
-  --t-small:   0.8125rem;   /* 13 */
-  --t-label:   0.6875rem;   /* 11 — always uppercase + tracked             */
+  --t-small:   0.875rem;    /* 14 */
+  --t-label:   0.75rem;     /* 12 — always uppercase + tracked             */
   --t-figure:  1.75rem;     /* 28 — instrument readouts                    */
 
   /* --- 8px grid, 4px for micro-adjustment -------------------------------- */
@@ -374,14 +374,21 @@ a:hover { color: var(--coffee-deep); }
 .depth { fill: none; stroke: var(--antique); stroke-width: 0.6; opacity: 0.3; stroke-dasharray: 6 4; }
 
 /* Swell: solid, filled head, Coffee — the primary signal. */
-.swell-crest { fill: none; stroke: var(--coffee); stroke-width: 0.7; opacity: 0.26; }
-.swell-arrow { stroke: var(--coffee); stroke-width: 2; fill: none; stroke-linecap: round; }
+/* Three weights on a repeating cycle. Uniform lines translating by exactly one
+   spacing are pixel-identical to where they started, so the motion cannot be
+   seen at all; this gives the eye a feature to track while the 3-line period
+   keeps the loop seamless. */
+.swell-crest { fill: none; stroke: var(--coffee); stroke-linecap: round; }
+.crest-0 { stroke-width: 1.5; opacity: 0.34; }
+.crest-1 { stroke-width: 0.7; opacity: 0.18; }
+.crest-2 { stroke-width: 0.9; opacity: 0.24; }
+.swell-arrow { stroke: var(--coffee); stroke-width: 3.4; fill: none; stroke-linecap: round; }
 .swell-head  { fill: var(--coffee); }
 
 /* Wind: dashed shaft, open chevron, Olive — deliberately a different visual
    language, so the two are told apart by shape as well as by colour. */
-.wind-arrow { stroke: var(--olive); stroke-width: 1.75; fill: none; stroke-dasharray: 4 3; stroke-linecap: round; }
-.wind-head  { stroke: var(--olive); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.wind-arrow { stroke: var(--olive); stroke-width: 3; fill: none; stroke-dasharray: 7 5; stroke-linecap: round; }
+.wind-head  { stroke: var(--olive); stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
 /* --- pins --------------------------------------------------------------- */
 
@@ -390,9 +397,9 @@ a:hover { color: var(--coffee-deep); }
 .pin .dot  { fill: var(--paper-raised); stroke: var(--antique); stroke-width: 1.5; }
 .chart-plate .name {
   font-family: var(--sans);
-  font-size: 8.5px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   fill: var(--ink-muted);
   pointer-events: none;
@@ -400,7 +407,7 @@ a:hover { color: var(--coffee-deep); }
      or a contour running under it never costs legibility. */
   paint-order: stroke fill;
   stroke: var(--paper-sunken);
-  stroke-width: 3px;
+  stroke-width: 3.5px;
   stroke-linejoin: round;
 }
 
@@ -441,7 +448,7 @@ a:hover { color: var(--coffee-deep); }
 .rose-hub { fill: var(--paper-raised); stroke: var(--olive); stroke-width: 0.6; }
 .rose-label {
   font-family: var(--serif);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   fill: var(--olive);
   letter-spacing: 0.04em;
@@ -485,7 +492,16 @@ a:hover { color: var(--coffee-deep); }
    the motion carries direction for the whole chart, and arrows are reserved
    for the spot you actually select. */
 @media (prefers-reduced-motion: no-preference) {
-  .swell-lines { animation: swell-march 5.5s linear infinite; }
+  /* One full 3-line cycle per 4s — fast enough to read as moving water, and
+     because it travels an exact whole number of line-spacings the restart is
+     invisible. transform-box/origin are pinned so the SVG group transforms in
+     user space rather than around its own bounding box. */
+  .swell-lines {
+    animation: swell-march 4s linear infinite;
+    transform-box: view-box;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
   .depth { animation: water-shimmer 18s linear infinite; }
 }
 @keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
@@ -497,12 +513,12 @@ a:hover { color: var(--coffee-deep); }
 .tide-mark { stroke: var(--coffee-deep); stroke-width: 0.9; }
 .tide-cap {
   font-family: var(--sans);
-  font-size: 6.5px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   fill: var(--ink-muted);
 }
-.tide-val { font-family: var(--mono); font-size: 6.5px; fill: var(--ink-muted); }
+.tide-val { font-family: var(--mono); font-size: 9.5px; fill: var(--ink-muted); }
 .shore-normal { stroke: var(--olive); stroke-width: 1; stroke-dasharray: 1.5 2.5; opacity: 0.8; }
 
 /* ==========================================================================
@@ -696,7 +712,14 @@ a:hover { color: var(--coffee-deep); }
 /* Two five-tile strips need roughly 500px between them; below that they stack
    rather than each getting squeezed into its own scrollbar. */
 .fc-days { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
-@media (max-width: 540px) { .fc-days { grid-template-columns: 1fr; gap: var(--s3); } }
+@media (max-width: 540px) {
+  .fc-days { grid-template-columns: 1fr; gap: var(--s3); }
+  /* Claw back the side padding so five tiles still fit a phone without the
+     day strip needing its own scroll — the week strip may scroll, a single
+     day should not. */
+  .fc { padding-left: var(--s3); padding-right: var(--s3); }
+  .fc-tile { width: 54px; }
+}
 
 /* The rest of the week is folded away behind a toggle: the two days above are
    the decision, the week is the plan. */
@@ -738,8 +761,8 @@ a:hover { color: var(--coffee-deep); }
 .fc-col + .fc-col .fc-day { border-left: 1px solid var(--rule-hair); }
 .fc-day {
   display: block;
-  min-height: 13px;         /* reserved even when blank, so tiles stay aligned */
-  font-size: 9px;
+  min-height: 15px;         /* reserved even when blank, so tiles stay aligned */
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -750,7 +773,7 @@ a:hover { color: var(--coffee-deep); }
 
 .fc-tile {
   flex: none;
-  width: 46px;
+  width: 58px;
   display: grid;
   justify-items: center;
   gap: 1px;
@@ -761,18 +784,18 @@ a:hover { color: var(--coffee-deep); }
   line-height: 1.1;
 }
 .fc-when {
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-muted);
   white-space: nowrap;
 }
-.fc-hs { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink); }
-.fc-unit { font-size: 7px; color: var(--ink-muted); margin-left: 1px; }
-.fc-period { font-size: 8.5px; color: var(--ink-muted); font-family: var(--mono); }
+.fc-hs { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--ink); }
+.fc-unit { font-size: 9px; color: var(--ink-muted); margin-left: 1px; }
+.fc-period { font-size: 10.5px; color: var(--ink-muted); font-family: var(--mono); }
 /* Hours already gone stay in place so the day reads whole, but recede. */
 .fc-tile.is-past { opacity: 0.42; }
-.fc-wind { font-size: 9px; color: var(--ink-muted); }
+.fc-wind { font-size: 10.5px; color: var(--ink-muted); }
 
 .fc-arrows { display: flex; gap: 3px; align-items: center; height: 8px; }
 /* Border triangles rather than 400 inline SVGs: at 6px a shape distinction is
