@@ -1,6 +1,9 @@
+import os
+import sys
 from http.server import BaseHTTPRequestHandler
 
-from _lib import get_tide_events, json_response, error_response
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _lib import get_tide_events, json_response, error_response  # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
