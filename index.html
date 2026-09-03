@@ -45,9 +45,14 @@
     </filter>
   </svg>
 
-  <!-- Chart-margin creatures, drawn once behind the whole page the way an old
-       chart fills its empty ocean. Decorative only, hidden from assistive tech. -->
-  <svg class="page-marginalia" id="page-marginalia" aria-hidden="true"></svg>
+  <!-- Marginalia: the creatures an old chart puts in its empty ocean. Anchored
+       to the page's outer margins, bleeding off the edge, and cropped via
+       object-position so only the creature shows — the Münster plate has a ship
+       in its right half, so it is framed to the monster alone. -->
+  <div class="marginalia" aria-hidden="true">
+    <img class="marg marg-serpent" src="assets/serpent-carta-marina-1539.jpg" alt="" />
+    <img class="marg marg-monster" src="assets/monster-munster-1544.jpg" alt="" />
+  </div>
 
   <header class="masthead wrap">
     <p class="kicker label">Sydney · Northern Beaches</p>

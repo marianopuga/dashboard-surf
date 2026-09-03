@@ -448,7 +448,7 @@ function renderChart(rows, cond, activeId) {
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
   const ROSE = { x: 272, y: 108, r: 20 };
-  const SHIP = { x: 258, y: 330 };
+  const SHIP = { x: 243, y: 318 };
   const SERPENT = { x: 248, y: 560 };
 
   svg.innerHTML = `
@@ -463,8 +463,7 @@ function renderChart(rows, cond, activeId) {
     ${field}
     <g class="chart-chrome" clip-path="url(#sea-clip)">
       ${CHROME.plate("assets/compass-rose-bowen-1747.jpg", ROSE.x, ROSE.y, 74, "rose")}
-      ${CHROME.plate("assets/ship-blaeu-1617.jpg", SHIP.x, SHIP.y, 72, "ship", 768 / 864)}
-      ${CHROME.seaSerpent(SERPENT.x, SERPENT.y, 0.62, false)}
+      ${CHROME.plate("assets/ship-blaeu-1617.jpg", SHIP.x, SHIP.y, 144, "ship", 768 / 864)}
     </g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
@@ -1043,23 +1042,9 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
   retime(STATE.hourOffset);
 }
 
-/** The page's background marginalia — an ouroboros and a serpent, sized in a
- *  fixed viewBox so they scale with the viewport rather than being pinned to
- *  pixel positions. Drawn once; nothing here changes with the data. */
-function renderMarginalia() {
-  const svg = document.getElementById("page-marginalia");
-  if (!svg) return;
-  svg.setAttribute("viewBox", "0 0 1000 1400");
-  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-  svg.innerHTML = `
-    ${CHROME.plate("assets/serpent-carta-marina-1539.jpg", 150, 320, 300, "marg", 375 / 425)}
-    ${CHROME.plate("assets/monster-munster-1544.jpg", 850, 1040, 360, "marg", 276 / 467)}`;
-}
-
 async function main() {
   for (const spot of SPOTS) spot.xy = snapToShore(project(spot.lat, spot.lng));
   wireTimeControl();
-  renderMarginalia();
 
   const swellP = fetchJson("/api/mhl");
   const windP = fetchJson("/api/wind");

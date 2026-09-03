@@ -67,21 +67,76 @@
 
 /* ==========================================================================
    Page marginalia — the creatures an old chart puts in its empty ocean.
-   Fixed behind everything, non-interactive, and faint enough to read as
-   watermark rather than illustration. Static: no animation, no filter.
+   --------------------------------------------------------------------------
+   Fixed to the page's outer edges and bled off them, so they sit in the
+   genuinely empty gutters beside the centred column rather than behind the
+   reading. They run through the same ink-stamp filter as the chart plates,
+   which drops their paper and forces them to the palette's olive, then sit at
+   an opacity that actually reads as ink — the previous 0.13 watermark was
+   invisible, which was the whole complaint.
    ========================================================================== */
-.page-marginalia {
+.marginalia {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.13;
+  overflow: hidden;
 }
-.page-marginalia .creature-body { stroke-width: 2.2; }
-body > *:not(.page-marginalia) { position: relative; z-index: 1; }
-@media (max-width: 980px) { .page-marginalia { display: none; } }
+.marg {
+  position: absolute;
+  display: block;
+  filter: url(#ink-stamp);
+  opacity: 0.55;
+  /* The ink-stamp drops white paper, but these plates sit on hatched blue sea,
+     which has mid luminance and therefore survives as a visible rectangle. A
+     soft mask dissolves the plate edge so it reads as ink bled into the page
+     rather than a photograph pasted onto it. */
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%,
+    #000 42%, rgba(0,0,0,0.55) 68%, transparent 88%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 50%,
+    #000 42%, rgba(0,0,0,0.55) 68%, transparent 88%);
+}
+/* Cropped to the creature: `cover` plus an object-position that pushes the
+   unwanted half of the plate out of the frame. */
+/* Anchored to the corners and bled off the edge. The masthead is centred type
+   with air either side of it and the colophon is short, so top-left and
+   bottom-right are the two regions that stay sparse at any width — which is
+   where an old chart would have put its creatures anyway. */
+.marg-serpent {
+  left: -4vw;
+  top: 1vh;
+  width: 32vw;
+  max-width: 360px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  /* Zoomed onto the coils; the ship and the "HIC EST HORRENDA CARIBDIS"
+     lettering sit in the upper-left of the plate and crop away. */
+  object-position: 42% 72%;
+  transform: rotate(-6deg) scale(1.08);
+  transform-origin: 35% 62%;
+}
+.marg-monster {
+  right: -5vw;
+  bottom: 2vh;
+  width: 42vw;
+  max-width: 470px;
+  aspect-ratio: 700 / 173;
+  object-fit: contain;        /* a wide strip — show the whole creature */
+  transform: rotate(-4deg) scaleX(-1);
+}
+body > *:not(.marginalia) { position: relative; z-index: 1; }
+
+/* Once there is a real gutter beside the 1180px column they can sit fully
+   clear of the text, so they carry more ink. */
+@media (min-width: 1320px) {
+  .marg { opacity: 0.62; }
+  .marg-serpent { left: 0.5vw; top: 6vh; }
+  .marg-monster { right: 0; bottom: 6vh; }
+}
+/* Narrow: they pass behind the reading column, so they step back enough to
+   stay decoration rather than interference. */
+@media (max-width: 900px) { .marg { opacity: 0.46; } }
+@media (max-width: 420px) { .marginalia { display: none; } }
 
 body {
   margin: 0;
@@ -397,9 +452,9 @@ a:hover { color: var(--coffee-deep); }
 .pin .dot  { fill: var(--paper-raised); stroke: var(--antique); stroke-width: 1.5; }
 .chart-plate .name {
   font-family: var(--sans);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   fill: var(--ink-muted);
   pointer-events: none;
@@ -524,12 +579,12 @@ a:hover { color: var(--coffee-deep); }
 .tide-mark { stroke: var(--coffee-deep); stroke-width: 0.9; }
 .tide-cap {
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   fill: var(--ink-muted);
 }
-.tide-val { font-family: var(--mono); font-size: 9.5px; fill: var(--ink-muted); }
+.tide-val { font-family: var(--mono); font-size: 11px; fill: var(--ink-muted); }
 .shore-normal { stroke: var(--olive); stroke-width: 1; stroke-dasharray: 1.5 2.5; opacity: 0.8; }
 
 /* ==========================================================================
@@ -729,7 +784,7 @@ a:hover { color: var(--coffee-deep); }
      day strip needing its own scroll — the week strip may scroll, a single
      day should not. */
   .fc { padding-left: var(--s3); padding-right: var(--s3); }
-  .fc-tile { width: 54px; }
+  .fc-tile { width: 58px; }
 }
 
 /* The rest of the week is folded away behind a toggle: the two days above are
@@ -772,8 +827,8 @@ a:hover { color: var(--coffee-deep); }
 .fc-col + .fc-col .fc-day { border-left: 1px solid var(--rule-hair); }
 .fc-day {
   display: block;
-  min-height: 15px;         /* reserved even when blank, so tiles stay aligned */
-  font-size: 10.5px;
+  min-height: 16px;         /* reserved even when blank, so tiles stay aligned */
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -784,7 +839,7 @@ a:hover { color: var(--coffee-deep); }
 
 .fc-tile {
   flex: none;
-  width: 58px;
+  width: 64px;
   display: grid;
   justify-items: center;
   gap: 1px;
@@ -795,18 +850,18 @@ a:hover { color: var(--coffee-deep); }
   line-height: 1.1;
 }
 .fc-when {
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-muted);
   white-space: nowrap;
 }
-.fc-hs { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--ink); }
-.fc-unit { font-size: 9px; color: var(--ink-muted); margin-left: 1px; }
-.fc-period { font-size: 10.5px; color: var(--ink-muted); font-family: var(--mono); }
+.fc-hs { font-family: var(--mono); font-size: 17px; font-weight: 500; color: var(--ink); }
+.fc-unit { font-size: 10px; color: var(--ink-muted); margin-left: 1px; }
+.fc-period { font-size: 11.5px; color: var(--ink-muted); font-family: var(--mono); }
 /* Hours already gone stay in place so the day reads whole, but recede. */
 .fc-tile.is-past { opacity: 0.42; }
-.fc-wind { font-size: 10.5px; color: var(--ink-muted); }
+.fc-wind { font-size: 11.5px; color: var(--ink-muted); }
 
 .fc-arrows { display: flex; gap: 3px; align-items: center; height: 8px; }
 /* Border triangles rather than 400 inline SVGs: at 6px a shape distinction is
