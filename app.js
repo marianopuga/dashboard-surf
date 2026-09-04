@@ -782,15 +782,19 @@ function renderChart(rows, cond, activeId) {
   svg.innerHTML = `
     <defs>
       <clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath>
-      <!-- The land's surface: the old-map photograph, knocked 72% toward the
-           land tone when it was baked so its own coastlines are not legible
-           and only the mottling and fibre survive.
+      <!-- The land's surface: generated parchment, not a photograph. Mottling
+           over four octaves of value noise, the fine ribbing a paper mould
+           leaves (laid lines every ~2.6px, chain lines every ~62px), a fibre
+           tooth, and a scatter of foxing.
 
-           Laid down ONCE, stretched across the whole plate, rather than tiled.
-           The land is a tall narrow strip, so any tile small enough to sit in
-           it repeats several times down its length and reads as wallpaper —
-           the same thing that went wrong when this photograph was first tried
-           as the page background. One image has no repeat to find. -->
+           It replaced a blurred crop of the old-map photograph, which read as
+           dirt rather than paper — blur a photograph of ink and what is left is
+           grey smear, and no amount of knocking it back toward the land tone
+           turns smear into fibre.
+
+           Laid down ONCE, stretched across the plate, rather than tiled: the
+           land is a tall narrow strip and any tile small enough to sit in it
+           would repeat several times down its length. -->
       <pattern id="land-tex" patternUnits="userSpaceOnUse"
                x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}">
         <image href="assets/land-parchment.jpg" x="${VIEW.x}" y="0"

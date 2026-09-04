@@ -656,12 +656,13 @@ a:hover { color: var(--coffee-deep); }
 
 .sea  { fill: var(--paper-raised); }
 .land { fill: var(--paper-sunken); }
-/* The photographed parchment, over the flat land fill. Kept below full
-   strength so the land still reads as the palette's own tone rather than as a
-   photograph dropped into the chart. */
-.land-tex { fill: url(#land-tex); pointer-events: none; opacity: 0.72; }
+/* Generated parchment, at full strength because it is already mixed on the
+   land's own tone rather than being a photograph knocked back toward it.
+   That is the whole difference: the previous texture was a blurred photo of
+   another map, and a blurred photo of ink reads as dirt, not as paper. */
+.land-tex { fill: url(#land-tex); pointer-events: none; }
 .land-grain { fill: url(#land-grain); pointer-events: none; }
-.land-stipple { fill: var(--coffee); opacity: 0.13; }
+.land-stipple { fill: var(--coffee); opacity: 0.09; }
 .shore { fill: none; stroke: var(--olive); stroke-width: 1.25; stroke-linejoin: round; }
 .rock  { fill: var(--paper-sunken); stroke: var(--olive); stroke-width: 0.75; }
 
