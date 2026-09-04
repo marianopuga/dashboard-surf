@@ -239,17 +239,12 @@
   .marg-kraken { transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 15%) rotate(3deg); }
 }
 
-/* Gessner's 1558 woodcut of Olaus Magnus's sea orm — the serpent taking a ship
-   by the mast. It is a wide, shallow plate (2.08:1) where the one it replaced
-   was square, so it is framed to its own aspect and bled further off the left:
-   the serpent's coils fill the margin and the ship it has hold of sits inward,
-   under the masthead's whitespace. Cropping it square instead would have
-   thrown away either the coils or the ship, and the two together are the
-   picture. */
 .marg-serpent {
   left: 0;
-  aspect-ratio: 887 / 427;
-  transform: translate(-22%, -6%) rotate(-4deg);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: 55% 45%;   /* the coiled body, away from the caption */
+  transform: translate(-16%, -30%) rotate(-6deg);
 }
 .marg-monster {
   right: 0;
@@ -286,7 +281,7 @@ body::after {
 /* A genuine gutter exists beyond this, so they can come fully on-page. */
 @media (min-width: 1400px) {
   .marg { opacity: 0.6; width: clamp(240px, 22vw, 420px); }
-  .marg-serpent { transform: translate(-8%, -4%) rotate(-4deg); }
+  .marg-serpent { transform: translate(-4%, -26%) rotate(-6deg); }
   .marg-monster { transform: translate(4%, -18%) rotate(4deg) scaleX(-1); }
 }
 @media (max-width: 820px) { .marg { opacity: 0.4; } }
@@ -1353,6 +1348,37 @@ a:hover { color: var(--coffee-deep); }
 }
 /* The one heading that sits on the bare ground rather than on a panel. */
 #sheet-heading { color: var(--ink-on-ground); }
+
+/* Gessner's sea orm, laid right across the colophon.
+   
+   It is the one plate that scrolls with the page rather than sitting in the
+   fixed layer, because it belongs to this block: it is a 2.08:1 picture and
+   the footer band is the only wide, shallow space here. Anywhere in the side
+   gutters it would have had to be cropped to a column, which costs either the
+   coils or the ship, and the two together are the picture.
+   
+   Its opacity is lower than every other plate and that figure is measured, not
+   chosen: the colophon's text sits directly on top of it, and at 0.34 the
+   darkest ink the filter can put under a letter still leaves 4.6:1. At 0.4 it
+   is 4.2:1 and fails. */
+.colophon { position: relative; }
+.marg-orm {
+  position: absolute;
+  /* Inset by more than the rotation can add. A rotated box reports a bounding
+     box wider than the element — at 1 degree over a ~300px height that is ~5px
+     each side — and at full width that was enough to push the page into
+     horizontal scroll. */
+  left: 8px;
+  top: 50%;
+  width: calc(100% - 16px);
+  aspect-ratio: 887 / 427;
+  z-index: -1;
+  opacity: 0.32;
+  transform: translateY(-50%) rotate(-1deg);
+}
+/* Below this the colophon collapses to a single narrow column and a 2.08:1
+   plate behind it is too small to read as a picture. */
+@media (max-width: 600px) { .marg-orm { display: none; } }
 
 .colophon dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s5); margin: 0; }
 /* `.label` sets its own colour, so these do not inherit the on-ground ink the
