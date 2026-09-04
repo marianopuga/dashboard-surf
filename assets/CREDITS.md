@@ -9,8 +9,20 @@ Supplied by the project owner.
 | `sea-monster.webp` | lone sea monster, antique map detail | masthead marginalia |
 | `sea-serpent.webp` | sea serpent | masthead marginalia |
 | `ouroboros.webp` | serpent taking its tail | unused |
+| `sea-unicorn.jpg` | sea unicorn, antique map detail | page marginalia, left |
+| `sea-dragon.jpg` | sea dragon woodcut | page marginalia, right |
+| `kraken.jpg` | kraken and galleons | page marginalia, lower left |
 | `an-old-map-of-the-world-with-a-map-of-the-world-photo.jpg` | unused — see below | not rendered |
 | `paper-fibre.png` | paper tooth | `body` background, tiled |
+
+## Why the kraken is a crop
+
+It arrived as a whole illustrated sheet — title, a destruction-data table,
+callout labels and an inset map. The lettering does not survive reading (it is
+pastiche, not real words), and a page of it in the margin would have invited
+exactly that reading. Cropped to the creature and the galleons in its grip,
+which is the only part that works as a chart marginal, and the crop is tight
+enough that nothing but the creature is left.
 
 ## Why the page ground is drawn rather than photographed
 

@@ -220,6 +220,67 @@ body::after {
 @media (max-width: 820px) { .marg { opacity: 0.4; } }
 @media (max-width: 480px) { .marginalia { display: none; } }
 
+/* --- the lower marginalia ------------------------------------------------
+   Three more engravings down the two gutters, fixed like the pair above so
+   they hold their place as the page scrolls.
+
+   They follow the same rule the top pair do: bled off the edge so only what
+   reaches in from the border shows, and given more of themselves as the window
+   widens and a real gutter opens up beside the 1180px column. Below 980px
+   there is no margin worth speaking of and they go entirely — unlike the top
+   pair, which have the masthead's own whitespace to sit in, these are level
+   with dense content and a sliver over a forecast strip is just noise.
+
+   They also sit lighter than the top pair, because down here they are behind
+   the reading rather than beside a title. */
+.marg-lower {
+  display: none;
+  top: auto;
+  aspect-ratio: auto;
+}
+
+@media (min-width: 980px) {
+  .marg-lower {
+    display: block;
+    opacity: 0.3;
+    width: clamp(150px, 14vw, 300px);
+  }
+  .marg-unicorn {
+    left: 0;
+    top: 34%;
+    aspect-ratio: 575 / 431;
+    transform: translate(-42%, 0) rotate(-4deg);
+  }
+  .marg-dragon {
+    right: 0;
+    top: 28%;
+    aspect-ratio: 800 / 769;
+    transform: translate(42%, 0) rotate(5deg) scaleX(-1);
+  }
+  .marg-kraken {
+    left: 0;
+    bottom: 5%;
+    aspect-ratio: 405 / 390;
+    transform: translate(-44%, 0) rotate(3deg);
+  }
+}
+
+/* A real gutter starts to open here, so they come further on-page. */
+@media (min-width: 1280px) {
+  .marg-lower { opacity: 0.4; width: clamp(200px, 15vw, 320px); }
+  .marg-unicorn { transform: translate(-16%, 0) rotate(-4deg); }
+  .marg-dragon  { transform: translate(16%, 0) rotate(5deg) scaleX(-1); }
+  .marg-kraken  { transform: translate(-18%, 0) rotate(3deg); }
+}
+
+/* Fully clear of the column: they can sit in the margin and carry more ink. */
+@media (min-width: 1600px) {
+  .marg-lower { opacity: 0.5; width: clamp(240px, 17vw, 360px); }
+  .marg-unicorn { transform: translate(-2%, 0) rotate(-4deg); }
+  .marg-dragon  { transform: translate(2%, 0) rotate(5deg) scaleX(-1); }
+  .marg-kraken  { transform: translate(0, 0) rotate(3deg); }
+}
+
 /* ==========================================================================
    The ground
    --------------------------------------------------------------------------

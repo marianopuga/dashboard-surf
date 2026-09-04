@@ -358,79 +358,97 @@ function crestField(from) {
 // relationship, so the combined movement does not repeat, which is what stops
 // it reading as a mechanism.
 const FLEET = [
-  { w: 66, rot: -3, roll: 11,  heave: 7.3 },
-  { w: 52, rot: -5, roll: 8.5, heave: 5.9 },
-  { w: 43, rot: -4, roll: 7,   heave: 4.7 },
+  // Smaller than before: the lane runs further out to sea, where these read as
+  // distant shipping, and a wide hull no longer fits between the Long Reef
+  // headland and the edge of the plate.
+  { w: 52, rot: -3, roll: 11,  heave: 7.3 },
+  { w: 44, rot: -5, roll: 8.5, heave: 5.9 },
+  { w: 36, rot: -4, roll: 7,   heave: 4.7 },
 ];
 
-// The stretch of coast a ship works, bottom to top. It starts just north of
-// the cartouche rather than off the bottom of the plate: the cartouche is
-// opaque and drawn last, and there is nowhere to pass it — east of it is off
-// the chart, and west of it the sea between shore and box is only ~49 units,
-// narrower than the largest hull. Ships used to be held invisible until they
-// were clear of it, which wasted a third of every passage.
-// The northern end is not the top edge of the plate. The Long Reef headland
-// juts east to x=245 around y=25-40, leaving a corridor of 312-245 = 67 units
-// where the widest hull needs 66 plus its clearance — it simply does not fit,
-// and a ship pushed as far east as the plate allows still had its beam 1 unit
-// off the sand. So a ship is gone before it gets there. Measured against the
-// shore profile: below y=45 the coast falls back to x=196 and the corridor
-// opens to 116.
-const LANE_Y0 = 95;     // faded out south of the headland pinch
-const LANE_Y1 = 480;    // in view, keel clear of the cartouche at y=537
+// The shipping lane, traced from the course drawn on the chart: up the outside
+// of the swell, well off the beaches, bowing west through the middle and then
+// bending back out to sea past Long Reef.
+//
+// Two adjustments to what was drawn. It is shifted ~18 units west, because the
+// line as drawn sat on the plate's own right edge and a hull centred there
+// would have been sliced in half by the viewBox; and the hook at the very top
+// runs off the chart, which is kept as a fade rather than as geometry — the
+// ship thins out as it leaves rather than being clipped.
+//
+// Ordered bottom (where a ship appears) to top (where it goes).
+const ROUTE = [
+  { x: 289, y: 499 },   // in the open, just north of the cartouche
+  { x: 287, y: 462 },
+  { x: 285, y: 411 },
+  { x: 282, y: 368 },
+  { x: 279, y: 324 },
+  { x: 273, y: 273 },
+  { x: 267, y: 222 },
+  { x: 261, y: 178 },
+  { x: 260, y: 134 },   // the westernmost point of the bow
+  { x: 262, y: 90 },
+  { x: 273, y: 50 },    // bending back out around Long Reef
+  { x: 289, y: 14 },
+  { x: 296, y: -15 },
+  { x: 298, y: -30 },   // gone
+];
+const LANE_Y1 = ROUTE[0].y;
+const LANE_Y0 = ROUTE[ROUTE.length - 1].y;
 
-// Clear water a ship keeps between its own beam and the beach. The track is
-// built outward from this, so it is a real clearance rather than a distance to
-// the hull's centre — the largest hull is 66 wide, and offsetting its *centre*
-// by this much would put a third of it on the sand.
-const OFFSHORE = [38, 58];
+// Least clear water between a hull and the beach. The lane is well offshore so
+// this almost never binds — it is a floor, not the thing that shapes the course.
+const MIN_CLEAR = 10;
 
-const SHIP_SPEED = 3.0;   // chart units per second (~128s a lap)
+const SHIP_SPEED = 3.6;   // chart units per second (~147s a lap)
+
+/** assets/ship-cutout.png, height / width. */
+const SHIP_ASPECT = 248 / 199;
+
+/** The fleet's DOM, kept across re-renders so voyages are never restarted. */
+let FLEET_NODE = null;
 
 /**
- * The course a ship holds: the shoreline, pushed `off` units further out than
- * its own beam. Following the coast is what keeps hulls off the land — it
- * swings between x=61 at Manly and x=196 at Long Reef, so any straight column
- * wide enough to clear the headlands runs aground somewhere else.
+ * A ship's own course: the shipping lane, nudged `off` units to one side so
+ * the three do not run in single file down exactly the same line.
  *
- * The shore is sampled as a MAXIMUM over the stretch each leg spans, not as a
- * point reading. A polyline only touches the coast at its vertices and cuts
- * the corner in between, so with point samples a headland peaking mid-leg is
- * simply missed — which is exactly what beached them: 11 of 200 swept
- * positions had a hull 22 units inland off the Long Reef and Dee Why points.
+ * Two clamps, both of which have bitten before:
+ *
+ *   East — a hull is `beam` wide either side of the line it rides, so the line
+ *   has to stay a beam clear of the plate's edge or the ship is sliced by the
+ *   viewBox.
+ *
+ *   West — the shore, sampled as a MAXIMUM over a window covering the hull's
+ *   own height. A polyline only touches the coast at its vertices and cuts the
+ *   corner between them, and only a ship's midpoint rides the line, so a
+ *   headland level with its bow is one the centre never sees. Point sampling
+ *   put hulls up to 48 units inland off Long Reef and Dee Why.
  */
 function shipTrack(off, beam, halfH) {
   const pts = [];
-  const N = 40;
+  const N = 48;
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
-  // The window has to cover the hull's own height, not just the leg. A ship is
-  // 82 units tall and only its midpoint sits on the track, so a headland level
-  // with its bow is one the centre line never sees — that left 171 of 1200
-  // swept positions with some part of a hull up to 48 units inland.
   const reach = halfH + span;
+  const eastLimit = COAST.W - 6 - beam;
+
   for (let i = 0; i <= N; i++) {
-    const y = LANE_Y1 + (LANE_Y0 - LANE_Y1) * (i / N);
+    const t = i / N;
+    // Walk the route by index; its points are close to evenly spaced in y.
+    const f = t * (ROUTE.length - 1);
+    const k = Math.min(ROUTE.length - 2, Math.floor(f)), frac = f - k;
+    const a = ROUTE[k], b = ROUTE[k + 1];
+    const y = a.y + (b.y - a.y) * frac;
+    const routeX = a.x + (b.x - a.x) * frac + off;
+
     let shore = -Infinity;
     for (let d = -reach; d <= reach; d += reach / 8) {
       shore = Math.max(shore, SHORE_X(clamp(y + d, 0, COAST.H)));
     }
-    // Never off the eastern edge of the plate, however far out the coast pushes.
-    pts.push({ x: Math.min(shore + beam + off, COAST.W - 8 - beam), y });
+    const westLimit = shore + beam + MIN_CLEAR;
+    pts.push({ x: clamp(routeX, Math.min(westLimit, eastLimit), eastLimit), y });
   }
   return pts;
 }
-
-/** The fleet's DOM, kept across re-renders so voyages are never restarted. */
-let FLEET_NODE = null;
-const SHIP_ASPECT = 248 / 199;   // assets/ship-cutout.png, height / width
-
-// ===========================================================================
-// The chart
-//
-// Decoration (compass rose, galleon, sea serpent) lives in chrome.js; this
-// file stays about data. Arrows are no longer drawn as an ambient field over
-// the water — they belong to a spot, and appear only when one is selected.
-// ===========================================================================
 
 /**
  * A vertical tide gauge on the chart: the column fills toward high water and
@@ -496,7 +514,7 @@ function sailFleet(svg) {
 
   svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
     const beam = FLEET[i].w * 0.5;
-    const track = shipTrack(rand(...OFFSHORE), beam, FLEET[i].w * SHIP_ASPECT * 0.5);
+    const track = shipTrack(rand(-9, 9), beam, FLEET[i].w * SHIP_ASPECT * 0.5);
 
     if (reduced) {
       // Becalmed, but still strung out along the coast rather than stacked.
