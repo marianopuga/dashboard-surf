@@ -16,29 +16,40 @@
   --noir:    #2E2F23;
   --raisin:  #22231A;
 
-  /* --- surfaces: three steps of paper, warm, never white ----------------- */
-  --paper-raised: #FAF7F3;  /* Salt +45% white — cards, the sheet          */
-  --paper:        #F1EBE4;  /* Salt            — page ground               */
-  --paper-sunken: #E7DFD5;  /* Salt −6%        — wells, land fill, stripes */
+  /* --- surfaces --------------------------------------------------------- */
+  /* Sampled off the reference photograph: its plainest stretch of paper sits
+     at rgb(176,139,78). The page ground is that tone; the sheets laid on it
+     are the same hue lifted toward the light, so everything reads as one
+     batch of paper under one lamp rather than as unrelated greys. */
+  --parchment-deep: #8A6A38;  /* darkest ground, page edges and vignette      */
+  --parchment:      #C7A971;  /* the ground the content sits on               */
+  --parchment-lit:  #F0E4CB;  /* the brightest paper — highlights, star edge  */
+  --paper-raised:   #EADCBE;  /* cards and the sheet — fresher paper, 10:1    */
+  --paper:          #DCC7A0;  /* mid tone, chart sea                          */
+  --paper-sunken:   #C9AE7E;  /* wells, land fill, inset rows                 */
 
-  /* --- lines: Antique, thinned over paper -------------------------------- */
-  --rule-hair:  #DFD8CC;    /* Antique @22% — default hairline             */
-  --rule:       #CFC7B7;    /* Antique @40% — dividers that must be seen   */
-  --rule-firm:  #B3AB98;    /* Antique @62% — chart frame, active borders  */
+  /* --- lines: warm brown, the colour of aged ink on tan ------------------ */
+  --rule-hair:  #C4AC85;    /* default hairline                             */
+  --rule:       #AE9264;    /* dividers that must be seen                   */
+  --rule-firm:  #8F7245;    /* chart frame, active borders                  */
 
   /* --- type: each step measured against --paper -------------------------- */
-  --ink:        #22231A;    /* Raisin  13.3:1 — display, key figures       */
-  --ink-body:   #2E2F23;    /* Noir    11.5:1 — body copy                  */
-  --ink-muted:  #6B6754;    /* Antique −25%  4.9:1 — captions, labels      */
+  --ink:        #22231A;    /* Raisin  11.7:1 on raised paper              */
+  --ink-body:   #2E2F23;    /* Noir    10.0:1 — body copy                  */
+  --ink-muted:  #57533F;    /* 5.7:1 on raised paper, 4.7:1 on --paper.
+                               Darker than the old #6B6754, which only made
+                               4.2:1 once the ground went from Salt to
+                               parchment — it read fine on near-white and
+                               failed AA on tan.                           */
                             /* (raw Antique is 3.3:1 — fine for lines and
                                graphics, too weak for small text)          */
 
   /* --- accents ----------------------------------------------------------- */
   --coffee-deep: #5A3C25;   /* pressed / hover                              */
-  --coffee-mid:  #A98A6E;   /* Coffee @55% — meters, secondary marks        */
-  --coffee-wash: #EADFD4;   /* Coffee @12% — tinted fills                   */
+  --coffee-mid:  #9A7550;   /* Coffee @55% — meters, secondary marks        */
+  --coffee-wash: #DDC7A0;   /* Coffee @12% — tinted fills                   */
   --olive-mid:   #8A8B78;   /* Olive @55%                                   */
-  --olive-wash:  #E2E1D6;   /* Olive @12%                                   */
+  --olive-wash:  #D6D0B4;   /* Olive @12%                                   */
 
   /* --- type scale (1.25 major third, 16px base) -------------------------- */
   --t-display: 2.5rem;      /* 40 */
@@ -132,6 +143,23 @@
 }
 body > *:not(.marginalia) { position: relative; z-index: 1; }
 
+/* The burnt edge. Fixed rather than scrolled, because it is the edge of the
+   *sheet the page is printed on*, not of the document — it should stay put
+   while the content slides under it. Paints above the marginalia (a generated
+   box is painted after element children at the same z-index) so the creatures
+   darken into the corners along with everything else, and below the content
+   layer at z-index 1 so it never washes over text. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 78% 74% at 50% 48%,
+      transparent 52%, rgba(74, 48, 16, 0.30) 88%, rgba(58, 36, 10, 0.46) 100%);
+}
+
 /* A genuine gutter exists beyond this, so they can come fully on-page. */
 @media (min-width: 1400px) {
   .marg { opacity: 0.6; width: clamp(240px, 22vw, 420px); }
@@ -141,9 +169,42 @@ body > *:not(.marginalia) { position: relative; z-index: 1; }
 @media (max-width: 820px) { .marg { opacity: 0.4; } }
 @media (max-width: 480px) { .marginalia { display: none; } }
 
+/* ==========================================================================
+   The ground
+   --------------------------------------------------------------------------
+   The page is a sheet of chart paper. Three layers, in paint order:
+
+     1. `map-backdrop.jpg` — the reference photograph, used ONCE at `cover`,
+        fixed, already knocked 62% toward the parchment tone when it was baked.
+        Used once and not tiled on purpose: the photograph is a *map*, and
+        every patch of it carries coastline or lettering, so any repeating tile
+        cut from it reads as wallpaper with an obvious repeat rather than as
+        paper. One large image has no seam to notice.
+     2. `paper-fibre.png` — a 256px seamless tile of fine procedural noise.
+        Paper tooth is just noise, and noise wraps by construction, so this is
+        generated rather than sampled. It gives the ground a surface at close
+        range that a soft photographic upscale cannot.
+     3. A warm wash from the top and two soft stains, breaking up the evenness
+        the way handling and damp would.
+
+   `--parchment` sits underneath as the base colour, so the page still has a
+   defined tone if the images fail, and body-text contrast can be reasoned
+   about against a token rather than against a photograph.
+   ========================================================================== */
 body {
   margin: 0;
-  background: var(--paper);
+  background-color: var(--parchment);
+  background-image:
+    radial-gradient(ellipse 140% 100% at 50% -10%,
+      rgba(255, 246, 226, 0.42), transparent 60%),
+    radial-gradient(ellipse 90% 70% at 88% 78%,
+      rgba(92, 62, 24, 0.16), transparent 68%),
+    url("assets/paper-fibre.png"),
+    url("assets/map-backdrop.jpg");
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+  background-size: cover, cover, 256px 256px, cover;
+  background-position: center, center, center, center;
+  background-attachment: fixed, fixed, fixed, fixed;
   color: var(--ink-body);
   font-family: var(--sans);
   font-size: var(--t-body);
@@ -210,10 +271,18 @@ a:hover { color: var(--coffee-deep); }
    Conditions band — the three live instrument readouts
    ========================================================================== */
 
+/* On a near-white page this strip could sit bare on the ground and still read.
+   On a photographed map it cannot: its muted captions were landing on drawn
+   coastline and lettering. It gets the same sheet of paper as every other
+   block, which also makes the page consistent — everything is now paper laid
+   on the chart, with nothing floating directly on it. */
 .conditions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-bottom: 1px solid var(--rule);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-firm);
+  box-shadow: 0 2px 12px rgba(58, 36, 10, 0.16);
+  padding: 0 var(--s5);
 }
 .reading { padding: var(--s5) var(--s5) var(--s5) 0; }
 .reading + .reading { padding-left: var(--s5); border-left: 1px solid var(--rule-hair); }
@@ -280,7 +349,12 @@ a:hover { color: var(--coffee-deep); }
   box-shadow:
     inset 0 0 0 4px var(--paper-raised),
     inset 0 0 0 5px var(--rule-hair),
-    inset 0 0 60px 10px rgba(34, 35, 26, 0.05);
+    inset 0 0 60px 10px rgba(34, 35, 26, 0.05),
+    /* Now that the ground is a dark parchment rather than near-white, a sheet
+       laid on it needs to cast something or it reads as a hole cut in the
+       page. Kept to a single soft drop, in the ground's own brown rather than
+       neutral black, so it stays a chart pinned to a table and not a UI card. */
+    0 2px 10px rgba(58, 36, 10, 0.20);
   padding: var(--s3);
   display: flex;
   flex-direction: column;
@@ -426,6 +500,8 @@ a:hover { color: var(--coffee-deep); }
 
 .sea  { fill: var(--paper-raised); }
 .land { fill: var(--paper-sunken); }
+.land-tex { fill: url(#land-tex); pointer-events: none; }
+.land-stipple { fill: var(--coffee); opacity: 0.16; }
 .shore { fill: none; stroke: var(--olive); stroke-width: 1.25; stroke-linejoin: round; }
 .rock  { fill: var(--paper-sunken); stroke: var(--olive); stroke-width: 0.75; }
 
@@ -436,7 +512,14 @@ a:hover { color: var(--coffee-deep); }
    spacing are pixel-identical to where they started, so the motion cannot be
    seen at all; this gives the eye a feature to track while the 3-line period
    keeps the loop seamless. */
-.swell-crest { fill: none; stroke: var(--coffee); stroke-linecap: round; }
+.swell-crest {
+  fill: none;
+  stroke: var(--coffee);
+  stroke-linecap: round;
+  /* The crests are sampled polylines, not true curves — round joins are what
+     turn ~9-unit straight segments into a continuous swell. */
+  stroke-linejoin: round;
+}
 .crest-0 { stroke-width: 1.5; opacity: 0.34; }
 .crest-1 { stroke-width: 0.7; opacity: 0.18; }
 .crest-2 { stroke-width: 0.9; opacity: 0.24; }
@@ -546,7 +629,12 @@ a:hover { color: var(--coffee-deep); }
 }
 .ship-line { fill: none; stroke: var(--olive); stroke-width: 0.35; opacity: 0.7; }
 .ship-flag { fill: var(--coffee); }
-.ship-wake { fill: none; stroke: var(--antique); stroke-width: 0.6; opacity: 0.5; stroke-linecap: round; }
+/* The water parting at the hull. Nested arcs fading outward, so the swell
+   visibly goes around the ship rather than simply stopping at the mask. */
+.ship-wake { fill: none; stroke: var(--coffee); stroke-linecap: round; }
+.wake-0 { stroke-width: 1.4; opacity: 0.55; }
+.wake-1 { stroke-width: 1.0; opacity: 0.36; }
+.wake-2 { stroke-width: 0.7; opacity: 0.22; }
 
 /* --- sea creatures ------------------------------------------------------ */
 .creature-body {
@@ -569,20 +657,95 @@ a:hover { color: var(--coffee-deep); }
    the motion carries direction for the whole chart, and arrows are reserved
    for the spot you actually select. */
 @media (prefers-reduced-motion: no-preference) {
-  /* One full 3-line cycle per 4s — fast enough to read as moving water, and
-     because it travels an exact whole number of line-spacings the restart is
+  /* One full 3-crest cycle per 5s — fast enough to read as moving water, and
+     because it travels an exact whole number of crest-spacings the restart is
      invisible. transform-box/origin are pinned so the SVG group transforms in
      user space rather than around its own bounding box. */
   .swell-lines {
-    animation: swell-march 4s linear infinite;
+    animation: swell-march 5s linear infinite;
     transform-box: view-box;
     transform-origin: 0 0;
     will-change: transform;
   }
   .depth { animation: water-shimmer 18s linear infinite; }
+
+  /* The fleet. Two motions kept in separate groups so neither has to know
+     about the other: the outer one is the ship making way across the chart,
+     the inner one is the hull answering the swell under it. Both are pure
+     transforms, so they composite without touching layout, and the periods are
+     deliberately unrelated (a ~40s traverse against a ~8s roll) so the two
+     never lock into a mechanical-looking beat. */
+  .ship-drift {
+    animation: ship-drift var(--dur, 40s) ease-in-out var(--delay, 0s) infinite alternate;
+    transform-box: view-box;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  .ship-bob {
+    animation: ship-bob var(--dur, 8s) ease-in-out var(--delay, 0s) infinite;
+    transform-box: fill-box;
+    transform-origin: 50% 78%;   /* the waterline, not the masthead */
+    will-change: transform;
+  }
 }
 @keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
 @keyframes water-shimmer { to { stroke-dashoffset: -40; } }
+@keyframes ship-drift {
+  from { transform: translate(calc(var(--dx) * -1), 0); }
+  to   { transform: translate(var(--dx), calc(var(--dx) * -0.35)); }
+}
+@keyframes ship-bob {
+  0%,100% { transform: rotate(-1.7deg) translateY(0.6px); }
+  50%     { transform: rotate(1.7deg)  translateY(-0.6px); }
+}
+
+/* --- the star on the best spot ------------------------------------------ */
+/* An old chart marks the place worth sailing to, and this is the only mark on
+   the map that answers "where do I go" without having to be read. It sits
+   under the pins so the dot it marks stays legible through it. */
+.best-star { pointer-events: none; }
+.star-mark {
+  fill: var(--coffee);
+  stroke: var(--parchment-lit);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+/* A filled star behind the mark, not a stroked one — a second outline read as
+   a cog rather than as a halo. */
+.star-glow { fill: var(--coffee); stroke: none; opacity: 0.20; }
+@media (prefers-reduced-motion: no-preference) {
+  .star-glow {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: star-breathe 3.2s ease-in-out infinite;
+  }
+}
+@keyframes star-breathe {
+  0%,100% { opacity: 0.10; transform: scale(0.94); }
+  50%     { opacity: 0.30; transform: scale(1.14); }
+}
+
+/* --- the cartouche ------------------------------------------------------ */
+/* The three numbers the chart's own graphics can only express as shape and
+   direction. Framed with the double rule a real chart cartouche always has. */
+.cart-bg { fill: var(--paper-raised); opacity: 0.93; stroke: var(--rule-firm); stroke-width: 0.8; }
+.cart-edge { fill: none; stroke: var(--rule-firm); stroke-width: 0.4; opacity: 0.7; }
+.cart-title {
+  font-family: var(--serif);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  fill: var(--coffee);
+}
+.cart-label {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  fill: var(--ink-muted);
+}
+.cart-val { font-size: 16px; font-weight: 600; fill: var(--ink); }
+.cart-unit { font-size: 9.5px; font-weight: 500; fill: var(--ink-muted); }
 
 /* --- tide gauge --------------------------------------------------------- */
 .tide-tube { fill: var(--paper-sunken); stroke: var(--rule-firm); stroke-width: 0.6; }
@@ -609,7 +772,7 @@ a:hover { color: var(--coffee-deep); }
   padding: var(--s5) var(--s5) var(--s4);
   margin-bottom: var(--s5);
   /* Barely-there lift. Not a Material card. */
-  box-shadow: 0 1px 2px rgba(34, 35, 26, 0.04), 0 12px 28px -20px rgba(34, 35, 26, 0.22);
+  box-shadow: 0 1px 2px rgba(58, 36, 10, 0.10), 0 3px 14px rgba(58, 36, 10, 0.18);
 }
 .verdict-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); }
 .verdict h2 { font-size: 1.875rem; line-height: 1.15; margin: var(--s1) 0 0; }
@@ -703,7 +866,8 @@ a:hover { color: var(--coffee-deep); }
 
 .sheet {
   background: var(--paper-raised);
-  border: 1px solid var(--rule-hair);
+  border: 1px solid var(--rule-firm);
+  box-shadow: 0 2px 12px rgba(58, 36, 10, 0.16);
   list-style: none;
   margin: 0;
   padding: 0;

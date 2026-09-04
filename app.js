@@ -285,30 +285,102 @@ const CREST_SPACING = 26;
  *  the opacity-pattern length below or the loop will visibly jump. */
 const CREST_CYCLE = 3;
 
+// A crest is drawn as a sine curve rather than a ruled line. WAVE_LEN is the
+// along-crest wavelength of that undulation and WAVE_AMP how far it swings —
+// both in chart units. Deliberately long and shallow: real swell crests are
+// nearly straight over a few hundred metres, and a tighter wiggle stops
+// reading as water and starts reading as a decorative squiggle.
+const WAVE_LEN = 88;
+const WAVE_AMP = 4.6;
+const CREST_STEP = 9;   // sampling interval along the crest
+
 /**
- * Parallel swell crest lines — the wave train, marching at the coast.
+ * The swell train — long undulating crests marching at the coast.
  *
- * The lines deliberately are NOT uniform. A perfectly even set of parallel
- * lines translated by exactly one spacing is pixel-identical to where it
- * started, so the motion is literally imperceptible — there is no feature to
- * track. Varying weight and opacity on a 3-line cycle gives the eye something
- * to follow, and translating a whole 3-line cycle keeps the loop seamless.
+ * Two things stop this from reading as a hatch pattern. First the crests are
+ * curves, not rules: each one swings about its own axis on a long sine, and
+ * neighbouring crests are offset in phase so the troughs of one sit against
+ * the peaks of the next, which is what gives the field its rolling texture.
+ *
+ * Second, the crests are NOT uniform in weight. A perfectly even set of lines
+ * translated by exactly one spacing is pixel-identical to where it started, so
+ * the motion would be imperceptible — there is no feature to track. Varying
+ * weight, opacity, amplitude and phase on a 3-crest cycle gives the eye
+ * something to follow, and translating a whole cycle keeps the loop seamless.
+ * Everything that varies is therefore a function of `k % CREST_CYCLE` only.
  */
 function crestField(from) {
-  const t = (from + 180) % 360;
-  const d = vec(t);
-  const p = { x: -d.y, y: d.x };
-  const cx = COAST.W / 2, cy = COAST.H / 2;
-  const reach = Math.hypot(COAST.W, COAST.H) * 1.4;
+  const d = vec((from + 180) % 360);        // travel direction
+  const p = { x: -d.y, y: d.x };            // along the crest
+  const cx = VIEW.x + VIEW.w / 2, cy = COAST.H / 2;
+  // Half the view diagonal plus a margin covers every corner at any rotation.
+  // (The old value was ~2.5x this, which generated geometry that was always
+  // clipped away — costly for a field that is now curves rather than lines.)
+  const reach = Math.hypot(VIEW.w, COAST.H) / 2 + 30;
   const span = Math.ceil(reach / CREST_SPACING);
+  const k2 = (2 * Math.PI) / WAVE_LEN;
   let out = "";
   for (let k = -span; k <= span; k++) {
-    const ax = cx + d.x * k * CREST_SPACING, ay = cy + d.y * k * CREST_SPACING;
     // ((k % 3) + 3) % 3 keeps the phase stable through negative k.
     const phase = ((k % CREST_CYCLE) + CREST_CYCLE) % CREST_CYCLE;
-    out += `<line class="swell-crest crest-${phase}"
-      x1="${(ax - p.x * reach).toFixed(1)}" y1="${(ay - p.y * reach).toFixed(1)}"
-      x2="${(ax + p.x * reach).toFixed(1)}" y2="${(ay + p.y * reach).toFixed(1)}"/>`;
+    const ax = cx + d.x * k * CREST_SPACING, ay = cy + d.y * k * CREST_SPACING;
+    const amp = WAVE_AMP * [1, 0.72, 0.88][phase];
+    const shift = [0, 2.3, 4.4][phase];     // radians — staggers the crests
+    let dd = "";
+    for (let s = -reach; s <= reach; s += CREST_STEP) {
+      const off = amp * Math.sin(s * k2 + shift);
+      const x = ax + p.x * s + d.x * off;
+      const y = ay + p.y * s + d.y * off;
+      dd += `${dd ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    out += `<path class="swell-crest crest-${phase}" d="${dd}"/>`;
+  }
+  return out;
+}
+
+// The fleet. Fixed points in open water, chosen against the geography rather
+// than derived from the spots: every one sits east of the shoreline's furthest
+// point (x≈193, at Long Reef) and clear of both the pin cluster and the
+// cartouche, so no ship can ever land on a reading. `drift` is how far it
+// wanders and `dur` how long one round trip takes — slow enough to notice only
+// if you watch, which is the point.
+// `rot` and `flip` only exist to break up the formation: three copies of one
+// plate at one angle, stacked down the right-hand side, read as a column of
+// clip-art rather than as ships that happen to be out there.
+const FLEET = [
+  { x: 270, y: 300, w: 74, drift: 13, dur: 41, delay: 0,   rot: -4, flip: false, hole: [54, 62] },
+  { x: 243, y: 152, w: 46, drift: 10, dur: 33, delay: -11, rot: 6,  flip: true,  hole: [36, 42] },
+  { x: 296, y: 468, w: 37, drift: 8,  dur: 47, delay: -25, rot: -8, flip: false, hole: [30, 35] },
+];
+const SHIP_ASPECT = 248 / 199;   // assets/ship-cutout.png, height / width
+
+/**
+ * The water parting at a hull. Masking the crests away around a ship stops the
+ * swell running *through* it, but on its own it just leaves a hole — the sea
+ * has to be seen to go around, not merely to stop. Three nested arcs at the
+ * waterline do that, and they are the same mark an engraver would have used.
+ *
+ * The waterline is at 78% of the plate's height, the same figure the bob
+ * animation rotates about, so the wake stays pinned to the hull rather than to
+ * the image box.
+ */
+function shipWake(s) {
+  const h = s.w * SHIP_ASPECT;
+  const yw = s.y - h / 2 + h * 0.78;
+  let out = "";
+  // The hull is roughly half a plate-width across at the waterline, so the
+  // innermost arc has to start wider than that or it hides under the ship
+  // instead of reading as water pushed aside. These reach well past it, out
+  // into the ring the mask clears.
+  for (let j = 0; j < 3; j++) {
+    const rx = s.w * (0.60 + j * 0.20);
+    // Deep enough to be a curve. At the first attempt the arcs dipped only
+    // 0.16 of a plate-width over a span of 1.3, which is flat enough that they
+    // rendered as three horizontal rules ruled under the hull.
+    const dip = s.w * (0.15 + j * 0.06);
+    out += `<path class="ship-wake wake-${j}"
+      d="M${(s.x - rx).toFixed(1)} ${yw.toFixed(1)}
+         Q${s.x.toFixed(1)} ${(yw + dip * 2).toFixed(1)} ${(s.x + rx).toFixed(1)} ${yw.toFixed(1)}"/>`;
   }
   return out;
 }
@@ -354,6 +426,48 @@ function tideGauge(cond, x, h) {
     <text class="tide-val" x="${x + w + 6}" y="${(y + h - fillH + 3).toFixed(1)}">${height.toFixed(1)}m</text>
     ${rising == null ? "" : `<text class="tide-cap" x="${x + w / 2}" y="${y + h + 12}"
       text-anchor="middle">${rising ? "▲" : "▼"}</text>`}
+  </g>`;
+}
+
+/** A five-pointed star, points up, centred on (cx,cy) with circumradius r. */
+function starPath(cx, cy, r, inner = 0.42) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const a = (-90 + i * 36) * (Math.PI / 180);
+    const rr = i % 2 ? r * inner : r;
+    pts.push(`${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)}`);
+  }
+  return `M${pts.join("L")}Z`;
+}
+
+/**
+ * The cartouche: the three numbers the chart's own graphics can only show as
+ * shape and direction — how big, how long between waves, how hard it is
+ * blowing. It reads for the *selected* spot, so it and the star agree by
+ * default (the page opens on the best spot) but diverge as you look around,
+ * which is what makes comparing spots worth doing.
+ */
+function cartouche(spot, score, cond, x, y, w) {
+  const hs = score?.hsAtSpot;
+  const rows = [
+    ["WAVE", hs == null ? "—" : fmtFt(hs, false), "ft"],
+    ["PERIOD", cond.periodS == null ? "—" : fmtNum(cond.periodS, 0), "s"],
+    ["WIND", cond.windKmh == null ? "—" : String(Math.round(cond.windKmh)), "km/h"],
+  ];
+  const h = 30 + rows.length * 26;
+  const lines = rows.map(([label, val, unit], i) => {
+    const ry = y + 34 + i * 26;
+    return `<text class="cart-label" x="${x + 12}" y="${ry}">${label}</text>
+      <text class="cart-val num" x="${x + w - 12}" y="${ry}" text-anchor="end">${val}<tspan
+        class="cart-unit"> ${unit}</tspan></text>`;
+  }).join("");
+  // Double rule, the way a chart cartouche is always framed.
+  return `<g class="cartouche">
+    <rect class="cart-bg" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/>
+    <rect class="cart-edge" x="${x + 3.5}" y="${y + 3.5}" width="${w - 7}" height="${h - 7}" rx="1"/>
+    <text class="cart-title" x="${x + w / 2}" y="${y + 16}" text-anchor="middle">${
+      spot ? spot.short.toUpperCase() : "CONDITIONS"}</text>
+    ${lines}
   </g>`;
 }
 
@@ -451,10 +565,69 @@ function renderChart(rows, cond, activeId) {
   // No rose is drawn any more, but the rhumb lines still need a node to
   // radiate from — an unmarked bearing node is ordinary on a portolan chart.
   const ROSE = { x: 266, y: 566, r: 20 };
-  const SHIP = { x: 262, y: 352 };
+
+  // The fleet, each hull in its own drift/bob pair of groups so the two motions
+  // compose without either having to know about the other.
+  const fleet = FLEET.map((s, i) => `
+    <g class="ship-drift ship-drift-${i}" style="--dx:${s.drift}px; --dur:${s.dur}s; --delay:${s.delay}s">
+      ${shipWake(s)}
+      <g class="ship-bob" style="--dur:${(s.dur / 5).toFixed(1)}s; --delay:${s.delay}s">
+        <g transform="rotate(${s.rot} ${s.x} ${s.y})${s.flip ? ` translate(${2 * s.x} 0) scale(-1 1)` : ""}">
+          ${CHROME.plate("assets/ship-cutout.png", s.x, s.y, s.w, "ship", SHIP_ASPECT)}
+        </g>
+      </g>
+    </g>`).join("");
+
+  // Water passes AROUND a hull, not behind it. The mask is opaque everywhere
+  // (crests draw) except for a soft-edged ellipse at each ship, sized to cover
+  // the whole of that ship's drift so the hole never slides off the hull. The
+  // gradient edge means the crests fade into the wake rather than stopping at
+  // a visible rim.
+  const holes = FLEET.map((s, i) => `
+    <radialGradient id="ship-hole-${i}">
+      <stop offset="0.55" stop-color="#000"/><stop offset="1" stop-color="#fff"/>
+    </radialGradient>
+    <ellipse cx="${s.x}" cy="${s.y}" rx="${s.hole[0]}" ry="${s.hole[1]}"
+             fill="url(#ship-hole-${i})"/>`).join("");
+
+  // The star marks the best spot at the selected hour — the one thing on the
+  // chart that answers "where do I go" without being read, so it is drawn from
+  // the same ranking as the verdict card rather than from the selection.
+  // Set just offshore of the pin rather than on it: the labels run west of the
+  // dots and the dots themselves are only 4.5 units across, so a star centred
+  // on the pin buries both. Offset east, into open water, it sits beside the
+  // place it marks — which is where a chart puts its mark anyway.
+  const best = rows.length ? rows.slice().sort(SCORE.compareScored)[0] : null;
+  const star = best && best.score.tier !== "flat"
+    ? `<g class="best-star"
+          transform="translate(${(best.spot.xy.x + 24).toFixed(1)},${(best.spot.xy.y - 12).toFixed(1)})">
+         <path class="star-glow" d="${starPath(0, 0, 13)}"/>
+         <path class="star-mark" d="${starPath(0, 0, 10)}"/>
+       </g>`
+    : "";
+
+  const active = SPOTS.find((s) => s.id === activeId);
+  const activeScore = rows.find((r) => r.spot.id === activeId)?.score;
+  const CART_W = 118;
 
   svg.innerHTML = `
-    <defs><clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath></defs>
+    <defs>
+      <clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath>
+      <!-- Stipple for the land. It was the one large flat fill left on the
+           chart, and a flat slab beside a textured page reads as a hole rather
+           than as ground. Two dots on an off-square, rotated grid: the offset
+           and the rotation stop the eye finding rows in it. -->
+      <pattern id="land-tex" width="7" height="7" patternUnits="userSpaceOnUse"
+               patternTransform="rotate(17)">
+        <circle class="land-stipple" cx="1.5" cy="1.5" r="0.55"/>
+        <circle class="land-stipple" cx="4.9" cy="4.3" r="0.4"/>
+      </pattern>
+      <mask id="around-ships" maskUnits="userSpaceOnUse"
+            x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}">
+        <rect x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}" fill="#fff"/>
+        ${holes}
+      </mask>
+    </defs>
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
       ${COAST.contours.map((d) => `<path class="depth" d="${d}"/>`).join("")}
@@ -462,17 +635,18 @@ function renderChart(rows, cond, activeId) {
         ${CHROME.rhumbLines(ROSE.x, ROSE.y, 620)}
       </g>
     </g>
-    ${field}
-    <g class="chart-chrome" clip-path="url(#sea-clip)">
-      ${CHROME.plate("assets/ship-cutout.png", SHIP.x, SHIP.y, 86, "ship", 293 / 210)}
-    </g>
+    <g mask="url(#around-ships)">${field}</g>
+    <g class="chart-chrome" clip-path="url(#sea-clip)">${fleet}</g>
     <path class="land" d="${LAND_PATH}"/>
+    <path class="land-tex" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
     ${COAST.rocks.map((d) => `<path class="rock" d="${d}"/>`).join("")}
     ${geometry.join("")}
+    ${star}
     ${pins.join("")}
     ${labels.join("")}
     ${tideGauge(cond, VIEW.x + 16, 108)}
+    ${cartouche(active, activeScore, cond, VIEW.x + VIEW.w - CART_W - 10, COAST.H - 130, CART_W)}
   `;
 
   svg.querySelectorAll(".pin").forEach((g) => {
