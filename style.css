@@ -148,7 +148,13 @@
   position: absolute;
   display: block;
   filter: url(#ink-stamp);
-  opacity: 0.55;
+  /* ONE opacity for every plate. The groups used to carry their own (0.55 for
+     the corners, 0.46 for the gutter) on top of source images with wildly
+     different ink weight, so some read crisp and others foggy. The plates are
+     now levelled to a common ink profile offline — see assets/CREDITS.md — and
+     the density difference is gone, which means they can and should all sit at
+     the same weight here. */
+  opacity: 0.52;
   /* The ink-stamp drops white paper, but these plates sit on hatched blue sea,
      which has mid luminance and therefore survives as a visible rectangle. A
      soft mask dissolves the plate edge so it reads as ink bled into the page
@@ -178,6 +184,35 @@
      one, where the whitespace either side of the h1 is only ~130px. */
   width: clamp(130px, 29vw, 460px);
 }
+/* The sea dragon, in the bottom-right corner — the same treatment as the pair
+   flanking the masthead rather than the gutter treatment of the other two:
+   same width, same bleed off the corner, so the two right-hand creatures read
+   as a matched pair top and bottom. Sized to the window, not to the gutter, so
+   it does not depend on there being a margin at all. */
+.marg-corner {
+  top: auto;
+  bottom: 0;
+  width: clamp(130px, 29vw, 460px);
+}
+/* Both bottom plates bleed DOWN off the page as well as sideways. Sitting them
+   a few percent up from the bottom left a band of bare parchment underneath,
+   which reads as a plate that missed its mark rather than as one running off
+   the edge — the corner has to be filled or not used. */
+.marg-dragon {
+  right: 0;
+  aspect-ratio: 800 / 769;
+  transform: translate(16%, 22%) rotate(5deg) scaleX(-1);
+}
+.marg-kraken {
+  left: 0;
+  aspect-ratio: 405 / 390;
+  transform: translate(-14%, 20%) rotate(3deg);
+}
+@media (min-width: 1400px) {
+  .marg-dragon { transform: translate(4%, 16%) rotate(5deg) scaleX(-1); }
+  .marg-kraken { transform: translate(-4%, 15%) rotate(3deg); }
+}
+
 .marg-serpent {
   left: 0;
   aspect-ratio: 1 / 1;
@@ -226,33 +261,29 @@ body::after {
 @media (max-width: 820px) { .marg { opacity: 0.4; } }
 @media (max-width: 480px) { .marginalia { display: none; } }
 
-/* --- the lower marginalia ------------------------------------------------
-   Three more engravings down the two gutters, fixed like the pair above so
-   they hold position as the page scrolls.
+/* --- the gutter marginalia -----------------------------------------------
+   The sea unicorn, in the left margin, fixed like the corner plates so it
+   holds position as the page scrolls.
 
-   Sizing them to fit *inside* the gutter was wrong twice over: it made them
-   small enough to read as smudges, and it was solving the wrong problem. What
-   was actually wrong before was that they were pushed 42% off the left and
-   right of the window — cut by the screen edge, which always looks like a
-   mistake.
-
-   So they now sit flush with the window edge and are exactly twice the gutter
-   wide. The outer half fills the margin; the inner half runs under the content
-   column, which reads as a plate tucked beneath the sheet rather than as one
-   sliced off. Nothing is ever cut by the viewport.
+   It is a wide, shallow plate, so it takes the tuck: flush with the window
+   edge and exactly twice the gutter wide, with the outer half filling the
+   margin and the inner half running under the content column. That reads as a
+   plate slipped beneath the sheet. Two things it is deliberately NOT: pushed
+   off the left of the window (cut by the screen, which always looks like a
+   mistake), and shrunk to fit inside the gutter (small enough to read as a
+   smudge). Both were tried.
 
        (100vw - 1180px)   is twice the gutter beside the content column
 
-   Below 1340px that is under 160px and there is not enough margin for these to
-   be anything but noise, so they are dropped. */
+   Below 1340px that is under 160px, too little margin for it to be anything
+   but noise, so it is dropped. */
 .marg-lower {
   display: none;
   top: auto;
   aspect-ratio: auto;
-  /* A gentler edge than the top pair. `.marg` dissolves from 42% out, which
-     suits a creature bleeding off the page but eats most of a plate that is
-     meant to sit whole in a margin — it was why the dragon looked small inside
-     its space even at full gutter width. This only softens the outer rim. */
+  /* A gentler edge than the corner plates. `.marg` dissolves everything
+     outside the middle 42%, which suits a creature bleeding off the page but
+     would eat most of one meant to be looked at. */
   -webkit-mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
     #000 0 76%, rgba(0,0,0,0.65) 90%, transparent 100%);
   mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
@@ -262,10 +293,8 @@ body::after {
 @media (min-width: 1340px) {
   .marg-lower {
     display: block;
-    opacity: 0.46;
     width: min(400px, calc(100vw - 1180px));
   }
-  /* Flush with the window edge, so the cut is never at the screen. */
   /* Raised, so its tail lands in the gap between the conditions panel and the
      chart rather than disappearing behind one of them. */
   .marg-unicorn {
@@ -274,35 +303,8 @@ body::after {
     aspect-ratio: 575 / 431;
     transform: rotate(-4deg);
   }
-  /* The one plate held WHOLLY inside the margin. It is nearly square, so at
-     twice the gutter it was tall enough that the half tucked under the column
-     took the creature itself and left only the tail showing — the tuck works
-     for a wide plate like the unicorn, not for this one. Sized to the gutter
-     instead: as large as it can be and still be entirely visible. */
-  /* Centred in the right margin and as wide as that margin allows: this plate
-     is nearly square, so width is what limits it, and the gutter is far taller
-     than it is wide. Held wholly inside the margin rather than tucked under the
-     column like the other two — at twice the gutter the hidden half took the
-     creature and left only its tail. */
-  .marg-dragon {
-    right: 8px;
-    top: 50%;
-    width: min(460px, calc((100vw - 1180px) / 2 - 16px));
-    aspect-ratio: 800 / 769;
-    transform: translateY(-50%) rotate(5deg) scaleX(-1);
-  }
-  .marg-kraken {
-    left: 0;
-    bottom: 5%;
-    aspect-ratio: 405 / 390;
-    transform: rotate(3deg);
-  }
 }
 
-/* A wide margin can carry more ink without crowding anything. */
-@media (min-width: 1800px) {
-  .marg-lower { opacity: 0.55; }
-}
 
 /* ==========================================================================
    The ground
