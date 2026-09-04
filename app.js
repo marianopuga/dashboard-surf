@@ -344,14 +344,26 @@ function crestField(from) {
 // cartouche, so no ship can ever land on a reading. `drift` is how far it
 // wanders and `dur` how long one round trip takes — slow enough to notice only
 // if you watch, which is the point.
-// `rot` and `flip` only exist to break up the formation: three copies of one
-// plate at one angle, stacked down the right-hand side, read as a column of
-// clip-art rather than as ships that happen to be out there.
+// The fleet. Only size and posture are fixed here — where each ship is and
+// where it is going is decided per voyage, at run time (see sailFleet).
+// `rot` and `flip` exist to break up the formation: three copies of one plate
+// at one angle read as clip-art rather than as ships that happen to be out
+// there.
 const FLEET = [
-  { x: 270, y: 300, w: 74, drift: 13, dur: 41, delay: 0,   rot: -4, flip: false, hole: [54, 62] },
-  { x: 243, y: 152, w: 46, drift: 10, dur: 33, delay: -11, rot: 6,  flip: true,  hole: [36, 42] },
-  { x: 296, y: 468, w: 37, drift: 8,  dur: 47, delay: -25, rot: -8, flip: false, hole: [30, 35] },
+  // 74 was too wide: the sea lane is only ~90 units across, so the largest
+  // hull filled it and left nothing for the water either side of it.
+  { w: 60, rot: -4, flip: false, bob: 8.2 },
+  { w: 46, rot: 6,  flip: true,  bob: 6.4 },
+  { w: 37, rot: -8, flip: false, bob: 5.5 },
 ];
+
+// The water a ship may sail in: east of the shoreline's furthest point
+// (x≈193, at Long Reef) and stopping short of the cartouche in the bottom
+// corner, so no hull ever crosses a reading.
+const SEA_LANE = { x0: 214, x1: 302, y0: 20, y1: 505 };
+
+/** The fleet's DOM, kept across re-renders so voyages are never restarted. */
+let FLEET_NODE = null;
 const SHIP_ASPECT = 248 / 199;   // assets/ship-cutout.png, height / width
 
 /**
@@ -366,8 +378,8 @@ const SHIP_ASPECT = 248 / 199;   // assets/ship-cutout.png, height / width
  */
 function shipWake(s) {
   const h = s.w * SHIP_ASPECT;
-  const yw = s.y - h / 2 + h * 0.78;
-  let out = "";
+  const yw = -h / 2 + h * 0.78;   // relative to the plate's centre: the ship
+  let out = "";                    // is drawn at the origin and moved by JS
   // The hull is roughly half a plate-width across at the waterline, so the
   // innermost arc has to start wider than that or it hides under the ship
   // instead of reading as water pushed aside. These reach well past it, out
@@ -379,8 +391,8 @@ function shipWake(s) {
     // rendered as three horizontal rules ruled under the hull.
     const dip = s.w * (0.15 + j * 0.06);
     out += `<path class="ship-wake wake-${j}"
-      d="M${(s.x - rx).toFixed(1)} ${yw.toFixed(1)}
-         Q${s.x.toFixed(1)} ${(yw + dip * 2).toFixed(1)} ${(s.x + rx).toFixed(1)} ${yw.toFixed(1)}"/>`;
+      d="M${(-rx).toFixed(1)} ${yw.toFixed(1)}
+         Q0 ${(yw + dip * 2).toFixed(1)} ${rx.toFixed(1)} ${yw.toFixed(1)}"/>`;
   }
   return out;
 }
@@ -427,6 +439,90 @@ function tideGauge(cond, x, h) {
     ${rising == null ? "" : `<text class="tide-cap" x="${x + w / 2}" y="${y + h + 12}"
       text-anchor="middle">${rising ? "▲" : "▼"}</text>`}
   </g>`;
+}
+
+/**
+ * Send the fleet sailing.
+ *
+ * Each ship gets its own voyage — a start, a finish, and a duration — fades in
+ * as it comes over the horizon, crosses, and fades out; then a *new* voyage is
+ * chosen and it comes back somewhere else. The randomness is real rather than
+ * a long looping animation, which is the difference between "the sea has ships
+ * on it" and "three sprites are on a timer".
+ *
+ * Done through the Web Animations API rather than CSS keyframes because the
+ * numbers change every voyage: CSS would need its keyframes rewritten each
+ * time, whereas here the next voyage is just the next call. The gap before a
+ * ship reappears is part of it — an empty sea that fills again reads as
+ * distance, where three permanently-present ships read as decoration.
+ *
+ * Every animation is a transform/opacity pair, so this stays on the compositor
+ * and costs nothing per frame regardless of how much else is repainting.
+ */
+function sailFleet(svg) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    // Still put them on the water — just becalmed, at a fixed spread.
+    svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
+      const y = SEA_LANE.y0 + ((i + 1) / (FLEET.length + 1)) * (SEA_LANE.y1 - SEA_LANE.y0);
+      g.setAttribute("transform", `translate(${(SEA_LANE.x0 + SEA_LANE.x1) / 2},${y.toFixed(1)})`);
+    });
+    return;
+  }
+
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  // The lane is only ~90 units wide and the largest hull is most of that, so
+  // two ships cannot pass each other side by side — left to pick freely they
+  // drift into the same water and overlap, which looks like a rendering fault
+  // rather than like shipping. The lane is therefore cut into bands and a ship
+  // claims one for the length of its voyage. Which band it gets is still
+  // chosen at random from whatever is free, and a ship waiting over the
+  // horizon holds nothing, so the sea stays unpredictable without ever
+  // stacking two hulls.
+  const bandCount = FLEET.length;
+  const bandH = (SEA_LANE.y1 - SEA_LANE.y0) / bandCount;
+  const taken = new Set();
+
+  svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
+    const beam = FLEET[i].w * 0.5;   // keep the hull off the lane's edges
+    const lane = () => rand(SEA_LANE.x0 + beam, SEA_LANE.x1 - beam);
+
+    const voyage = () => {
+      const free = [];
+      for (let b = 0; b < bandCount; b++) if (!taken.has(b)) free.push(b);
+      if (!free.length) return void setTimeout(voyage, rand(3000, 9000));
+      const band = free[Math.floor(Math.random() * free.length)];
+      taken.add(band);
+
+      // Ships work up and down the coast, which is the only axis with room.
+      // The ends sit a little outside the band so the fade happens off its
+      // edges and neighbouring bands never show two hulls at once.
+      const top = SEA_LANE.y0 + band * bandH - 30;
+      const bot = SEA_LANE.y0 + (band + 1) * bandH + 30;
+      const northbound = Math.random() < 0.5;
+      const anim = g.animate(
+        [
+          { transform: `translate(${lane().toFixed(1)}px,${(northbound ? bot : top).toFixed(1)}px)`,
+            opacity: 0 },
+          { opacity: 0.95, offset: 0.18 },
+          { opacity: 0.95, offset: 0.82 },
+          { transform: `translate(${lane().toFixed(1)}px,${(northbound ? top : bot).toFixed(1)}px)`,
+            opacity: 0 },
+        ],
+        { duration: rand(48000, 92000), easing: "linear", fill: "forwards" }
+      );
+      // A pause over the horizon before the next one, so the sea is sometimes
+      // emptier than it is now and the reappearance is not on a beat.
+      anim.onfinish = () => {
+        taken.delete(band);
+        setTimeout(voyage, rand(5000, 26000));
+      };
+    };
+
+    // Stagger the first departures, otherwise all three set out together on
+    // load and the whole point is lost in the first minute.
+    setTimeout(voyage, rand(0, 9000));
+  });
 }
 
 /** A five-pointed star, points up, centred on (cx,cy) with circumradius r. */
@@ -509,6 +605,13 @@ function renderChart(rows, cond, activeId) {
     prev = y;
   }
 
+  // The best spot at this hour, from the same ranking the verdict card uses —
+  // not from the selection, so the mark keeps answering "where do I go" even
+  // while you are looking at somewhere else. Nothing is starred when nothing
+  // is worth the trip.
+  const bestRow = rows.length ? rows.slice().sort(SCORE.compareScored)[0] : null;
+  const bestId = bestRow && bestRow.score.tier !== "flat" ? bestRow.spot.id : null;
+
   // Split into two layers: the active spot's geometry sits under every pin, so
   // a wedge can never cover a neighbouring dot.
   const geometry = [];
@@ -542,10 +645,18 @@ function renderChart(rows, cond, activeId) {
           : ""
       );
     }
-    return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""}" data-spot="${spot.id}"
+    // The best spot's marker IS a star — it replaces the dot rather than
+    // sitting beside it, so there is exactly one mark per spot and the star is
+    // read as "this one" instead of as another piece of chart furniture.
+    const isBest = spot.id === bestId;
+    return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""} ${isBest ? "is-best" : ""}"
+              data-spot="${spot.id}"
               transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})">
-        <circle class="halo" r="9"/>
-        <circle class="dot" r="4.5"/>
+        <circle class="halo" r="${isBest ? 12 : 9}"/>
+        ${isBest
+          ? `<path class="star-glow" d="${starPath(0, 0, 13)}"/>
+             <path class="dot dot-star" d="${starPath(0, 0, 8.5)}"/>`
+          : `<circle class="dot" r="4.5"/>`}
       </g>`;
   });
 
@@ -566,45 +677,27 @@ function renderChart(rows, cond, activeId) {
   // radiate from — an unmarked bearing node is ordinary on a portolan chart.
   const ROSE = { x: 266, y: 566, r: 20 };
 
-  // The fleet, each hull in its own drift/bob pair of groups so the two motions
-  // compose without either having to know about the other.
+  // The fleet. Each ship is drawn at the origin and moved entirely by an
+  // animation assigned in JS (see sailFleet), so the markup here carries no
+  // position at all — that is what lets each voyage be different and lets a
+  // new one be chosen every time a ship sails off.
   const fleet = FLEET.map((s, i) => `
-    <g class="ship-drift ship-drift-${i}" style="--dx:${s.drift}px; --dur:${s.dur}s; --delay:${s.delay}s">
+    <g class="ship-voyage" data-ship="${i}">
+      <!-- The water the hull has pushed aside. This is a filled patch of sea
+           colour laid OVER the crests, not a hole cut in them, which is the
+           whole reason it can move: a mask would have to be re-cut every frame
+           to follow a ship, whereas a sibling inside the moving group follows
+           for free. Its soft edge makes the swell fade into the wake rather
+           than stop against a rim. -->
+      <ellipse class="ship-clearing" cx="0" cy="0"
+               rx="${s.w * 0.78}" ry="${s.w * 0.92}" fill="url(#ship-clearing)"/>
       ${shipWake(s)}
-      <g class="ship-bob" style="--dur:${(s.dur / 5).toFixed(1)}s; --delay:${s.delay}s">
-        <g transform="rotate(${s.rot} ${s.x} ${s.y})${s.flip ? ` translate(${2 * s.x} 0) scale(-1 1)` : ""}">
-          ${CHROME.plate("assets/ship-cutout.png", s.x, s.y, s.w, "ship", SHIP_ASPECT)}
+      <g class="ship-bob" style="--dur:${s.bob}s">
+        <g transform="rotate(${s.rot})${s.flip ? " scale(-1 1)" : ""}">
+          ${CHROME.plate("assets/ship-cutout.png", 0, 0, s.w, "ship", SHIP_ASPECT)}
         </g>
       </g>
     </g>`).join("");
-
-  // Water passes AROUND a hull, not behind it. The mask is opaque everywhere
-  // (crests draw) except for a soft-edged ellipse at each ship, sized to cover
-  // the whole of that ship's drift so the hole never slides off the hull. The
-  // gradient edge means the crests fade into the wake rather than stopping at
-  // a visible rim.
-  const holes = FLEET.map((s, i) => `
-    <radialGradient id="ship-hole-${i}">
-      <stop offset="0.55" stop-color="#000"/><stop offset="1" stop-color="#fff"/>
-    </radialGradient>
-    <ellipse cx="${s.x}" cy="${s.y}" rx="${s.hole[0]}" ry="${s.hole[1]}"
-             fill="url(#ship-hole-${i})"/>`).join("");
-
-  // The star marks the best spot at the selected hour — the one thing on the
-  // chart that answers "where do I go" without being read, so it is drawn from
-  // the same ranking as the verdict card rather than from the selection.
-  // Set just offshore of the pin rather than on it: the labels run west of the
-  // dots and the dots themselves are only 4.5 units across, so a star centred
-  // on the pin buries both. Offset east, into open water, it sits beside the
-  // place it marks — which is where a chart puts its mark anyway.
-  const best = rows.length ? rows.slice().sort(SCORE.compareScored)[0] : null;
-  const star = best && best.score.tier !== "flat"
-    ? `<g class="best-star"
-          transform="translate(${(best.spot.xy.x + 24).toFixed(1)},${(best.spot.xy.y - 12).toFixed(1)})">
-         <path class="star-glow" d="${starPath(0, 0, 13)}"/>
-         <path class="star-mark" d="${starPath(0, 0, 10)}"/>
-       </g>`
-    : "";
 
   const active = SPOTS.find((s) => s.id === activeId);
   const activeScore = rows.find((r) => r.spot.id === activeId)?.score;
@@ -622,11 +715,12 @@ function renderChart(rows, cond, activeId) {
         <circle class="land-stipple" cx="1.5" cy="1.5" r="0.55"/>
         <circle class="land-stipple" cx="4.9" cy="4.3" r="0.4"/>
       </pattern>
-      <mask id="around-ships" maskUnits="userSpaceOnUse"
-            x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}">
-        <rect x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}" fill="#fff"/>
-        ${holes}
-      </mask>
+      <!-- The patch of settled water a hull sits in: opaque sea at the centre,
+           falling away to nothing so the swell fades into it. -->
+      <radialGradient id="ship-clearing">
+        <stop offset="0.42" class="clearing-in"/>
+        <stop offset="1" class="clearing-out"/>
+      </radialGradient>
     </defs>
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
@@ -635,19 +729,34 @@ function renderChart(rows, cond, activeId) {
         ${CHROME.rhumbLines(ROSE.x, ROSE.y, 620)}
       </g>
     </g>
-    <g mask="url(#around-ships)">${field}</g>
-    <g class="chart-chrome" clip-path="url(#sea-clip)">${fleet}</g>
+    ${field}
+    <g class="chart-chrome fleet-layer" clip-path="url(#sea-clip)"></g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="land-tex" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
     ${COAST.rocks.map((d) => `<path class="rock" d="${d}"/>`).join("")}
     ${geometry.join("")}
-    ${star}
     ${pins.join("")}
     ${labels.join("")}
     ${tideGauge(cond, VIEW.x + 16, 108)}
     ${cartouche(active, activeScore, cond, VIEW.x + VIEW.w - CART_W - 10, COAST.H - 130, CART_W)}
   `;
+
+  // The fleet is built ONCE and then moved into each fresh render, rather than
+  // re-rendered with everything else. renderChart runs on every slider tick and
+  // every hover, and rebuilding the ships would restart their voyages each
+  // time — they would never get anywhere. Re-parenting an element does not
+  // cancel its running animations, so moving the node keeps every ship exactly
+  // where it had sailed to.
+  const layer = svg.querySelector(".fleet-layer");
+  if (!FLEET_NODE) {
+    FLEET_NODE = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    FLEET_NODE.innerHTML = fleet;
+    layer.appendChild(FLEET_NODE);
+    sailFleet(FLEET_NODE);
+  } else {
+    layer.appendChild(FLEET_NODE);
+  }
 
   svg.querySelectorAll(".pin").forEach((g) => {
     const id = g.dataset.spot;
@@ -1223,6 +1332,9 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
 
 async function main() {
   for (const spot of SPOTS) spot.xy = snapToShore(project(spot.lat, spot.lng));
+  // Drawn once and never touched again — it does not depend on any data, so
+  // no repaint, no slider tick and no fetch can cost anything here.
+  document.getElementById("ground").innerHTML = CHROME.pageGround(1600, 1000);
   wireTimeControl();
 
   const swellP = fetchJson("/api/mhl");

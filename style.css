@@ -86,6 +86,29 @@
    an opacity that actually reads as ink — the previous 0.13 watermark was
    invisible, which was the whole complaint.
    ========================================================================== */
+/* The drawn ground — graticule and rhumb lines. Fixed and sliced to cover, so
+   it behaves like the sheet the page sits on and does not scroll with it. Very
+   low ink throughout: this has to be felt rather than read, or it competes
+   with the chart, which is the actual map on this page. */
+.ground {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.gnd-grat {
+  fill: none;
+  stroke: var(--coffee);
+  stroke-width: 1.1;
+  opacity: 0.11;
+  stroke-linecap: round;
+}
+.gnd-rhumb { fill: none; stroke: var(--coffee); stroke-width: 0.8; opacity: 0.055; }
+.gnd-rhumb-main { stroke-width: 1; opacity: 0.09; }
+.gnd-ring { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.12; }
+
 .marginalia {
   position: fixed;
   inset: 0;
@@ -141,7 +164,11 @@
   object-position: 62% 60%;   /* head and coil, away from the map lettering */
   transform: translate(16%, -20%) rotate(4deg) scaleX(-1);
 }
-body > *:not(.marginalia) { position: relative; z-index: 1; }
+/* Lift the content above the two fixed background layers. Both of those have
+   to be excluded by name: the rule sets `position: relative`, which would
+   otherwise beat their own `position: fixed` and drop them back into the flow,
+   where a full-height layer pushes the whole page down past it. */
+body > *:not(.marginalia):not(.ground) { position: relative; z-index: 1; }
 
 /* The burnt edge. Fixed rather than scrolled, because it is the edge of the
    *sheet the page is printed on*, not of the document — it should stay put
@@ -172,24 +199,21 @@ body::after {
 /* ==========================================================================
    The ground
    --------------------------------------------------------------------------
-   The page is a sheet of chart paper. Three layers, in paint order:
+   The page is a sheet of chart paper: a parchment tone, paper tooth, some
+   uneven staining, and — in `#ground` — a graticule and rhumb lines drawn
+   freehand at load.
 
-     1. `map-backdrop.jpg` — the reference photograph, used ONCE at `cover`,
-        fixed, already knocked 62% toward the parchment tone when it was baked.
-        Used once and not tiled on purpose: the photograph is a *map*, and
-        every patch of it carries coastline or lettering, so any repeating tile
-        cut from it reads as wallpaper with an obvious repeat rather than as
-        paper. One large image has no seam to notice.
-     2. `paper-fibre.png` — a 256px seamless tile of fine procedural noise.
-        Paper tooth is just noise, and noise wraps by construction, so this is
-        generated rather than sampled. It gives the ground a surface at close
-        range that a soft photographic upscale cannot.
-     3. A warm wash from the top and two soft stains, breaking up the evenness
-        the way handling and damp would.
+   A photograph of a real old map was tried here first and was wrong. It is not
+   that it looked bad on its own; it is that it arrives carrying its own
+   coastlines, its own graticule at its own angle and its own lettering, none
+   of which agree with the chart laid on top. Two maps at two scales in two
+   directions read as a collision, not as a surface. What actually reads as
+   "old map" is the marks, not any particular map — so the marks are drawn, at
+   this page's own scale, quiet enough to sit under the content.
 
-   `--parchment` sits underneath as the base colour, so the page still has a
-   defined tone if the images fail, and body-text contrast can be reasoned
-   about against a token rather than against a photograph.
+   `paper-fibre.png` stays: paper tooth is fine noise, noise tiles seamlessly
+   by construction, and it gives the ground a surface at close range that flat
+   colour cannot.
    ========================================================================== */
 body {
   margin: 0;
@@ -199,11 +223,11 @@ body {
       rgba(255, 246, 226, 0.42), transparent 60%),
     radial-gradient(ellipse 90% 70% at 88% 78%,
       rgba(92, 62, 24, 0.16), transparent 68%),
-    url("assets/paper-fibre.png"),
-    url("assets/map-backdrop.jpg");
-  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
-  background-size: cover, cover, 256px 256px, cover;
-  background-position: center, center, center, center;
+    radial-gradient(ellipse 70% 55% at 8% 38%,
+      rgba(92, 62, 24, 0.13), transparent 70%),
+    url("assets/paper-fibre.png");
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-size: cover, cover, cover, 256px 256px;
   background-attachment: fixed, fixed, fixed, fixed;
   color: var(--ink-body);
   font-family: var(--sans);
@@ -631,6 +655,11 @@ a:hover { color: var(--coffee-deep); }
 .ship-flag { fill: var(--coffee); }
 /* The water parting at the hull. Nested arcs fading outward, so the swell
    visibly goes around the ship rather than simply stopping at the mask. */
+/* The settled water a hull sits in. Same colour as the sea, so it reads as
+   water rather than as a patch: opaque at the centre, gone by the edge. */
+.clearing-in  { stop-color: var(--paper-raised); stop-opacity: 1; }
+.clearing-out { stop-color: var(--paper-raised); stop-opacity: 0; }
+
 .ship-wake { fill: none; stroke: var(--coffee); stroke-linecap: round; }
 .wake-0 { stroke-width: 1.4; opacity: 0.55; }
 .wake-1 { stroke-width: 1.0; opacity: 0.36; }
@@ -675,14 +704,8 @@ a:hover { color: var(--coffee-deep); }
      transforms, so they composite without touching layout, and the periods are
      deliberately unrelated (a ~40s traverse against a ~8s roll) so the two
      never lock into a mechanical-looking beat. */
-  .ship-drift {
-    animation: ship-drift var(--dur, 40s) ease-in-out var(--delay, 0s) infinite alternate;
-    transform-box: view-box;
-    transform-origin: 0 0;
-    will-change: transform;
-  }
   .ship-bob {
-    animation: ship-bob var(--dur, 8s) ease-in-out var(--delay, 0s) infinite;
+    animation: ship-bob var(--dur, 8s) ease-in-out infinite;
     transform-box: fill-box;
     transform-origin: 50% 78%;   /* the waterline, not the masthead */
     will-change: transform;
@@ -690,10 +713,6 @@ a:hover { color: var(--coffee-deep); }
 }
 @keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
 @keyframes water-shimmer { to { stroke-dashoffset: -40; } }
-@keyframes ship-drift {
-  from { transform: translate(calc(var(--dx) * -1), 0); }
-  to   { transform: translate(var(--dx), calc(var(--dx) * -0.35)); }
-}
 @keyframes ship-bob {
   0%,100% { transform: rotate(-1.7deg) translateY(0.6px); }
   50%     { transform: rotate(1.7deg)  translateY(-0.6px); }
@@ -703,13 +722,7 @@ a:hover { color: var(--coffee-deep); }
 /* An old chart marks the place worth sailing to, and this is the only mark on
    the map that answers "where do I go" without having to be read. It sits
    under the pins so the dot it marks stays legible through it. */
-.best-star { pointer-events: none; }
-.star-mark {
-  fill: var(--coffee);
-  stroke: var(--parchment-lit);
-  stroke-width: 1.1;
-  stroke-linejoin: round;
-}
+.pin .dot-star { stroke-linejoin: round; }
 /* A filled star behind the mark, not a stroked one — a second outline read as
    a cog rather than as a halo. */
 .star-glow { fill: var(--coffee); stroke: none; opacity: 0.20; }
@@ -720,6 +733,12 @@ a:hover { color: var(--coffee-deep); }
     animation: star-breathe 3.2s ease-in-out infinite;
   }
 }
+/* The star is the marker itself, so it takes the tier colours the dot would
+   have taken — but always filled, never the hollow "flat" treatment, because
+   nothing is starred unless it is worth the trip. */
+.pin.is-best .dot-star { fill: var(--coffee); stroke: var(--parchment-lit); stroke-width: 1.2; }
+.pin.is-best.q-epic .dot-star,
+.pin.is-best.q-pumping .dot-star { fill: var(--raisin); }
 @keyframes star-breathe {
   0%,100% { opacity: 0.10; transform: scale(0.94); }
   50%     { opacity: 0.30; transform: scale(1.14); }

@@ -260,5 +260,112 @@ const CHROME = (() => {
     </g>`;
   }
 
-  return { plate, plateCrop, compassRose, rhumbLines, galleon, seaSerpent, ouroboros };
+  // =========================================================================
+  // The page ground
+  //
+  // Drawn, not photographed. A photograph of a real map was tried as the page
+  // background and did not work: it arrives with its own coastlines, its own
+  // graticule at its own angle and its own lettering, none of which line up
+  // with the chart sitting on top of it, so the two read as two maps fighting
+  // rather than as one surface. What actually says "old map" is not any
+  // particular map — it is a handful of marks: a graticule, rhumb lines
+  // radiating from bearing nodes, and the fact that every one of them was
+  // ruled by a human hand and is therefore slightly wrong.
+  //
+  // So the ground is those marks, generated, faint, and — crucially — drawn
+  // freehand: every line wobbles off true by a few units, most at its middle
+  // and not at all at its ends, which is how a line drawn against a straight
+  // edge by hand actually fails.
+  // =========================================================================
+
+  /** Deterministic PRNG (mulberry32) — the same page ground on every load. */
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /**
+   * A straight line as a hand would draw it: sampled into segments and pushed
+   * off the true line perpendicularly, by an amount that peaks in the middle
+   * and falls to zero at both ends — a hand is accurate where it starts and
+   * where it aims, and drifts in between.
+   */
+  function freehand(x1, y1, x2, y2, rnd, wobble = 4, seg = 10) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const px = -dy / len, py = dx / len;
+    const bias = (rnd() * 2 - 1) * wobble;   // the whole line's lean
+    let d = "";
+    for (let i = 0; i <= seg; i++) {
+      const t = i / seg;
+      const off = Math.sin(t * Math.PI) * (bias + (rnd() * 2 - 1) * wobble * 0.5);
+      d += `${i ? "L" : "M"}${n(x1 + dx * t + px * off)} ${n(y1 + dy * t + py * off)}`;
+    }
+    return d;
+  }
+
+  /** A ring drawn by hand: radius breathes a little as it goes round. */
+  function freehandRing(cx, cy, r, rnd, wobble = 1.6, seg = 48) {
+    let d = "";
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      const rr = r + (rnd() * 2 - 1) * wobble;
+      d += `${i ? "L" : "M"}${n(cx + Math.cos(a) * rr)} ${n(cy + Math.sin(a) * rr)}`;
+    }
+    return d + "Z";
+  }
+
+  /**
+   * The full page ground, as markup for a fixed background SVG.
+   * `w`/`h` are the viewBox, not pixels — it is sliced to cover the viewport.
+   */
+  function pageGround(w, h, seed = 20260904) {
+    const rnd = rng(seed);
+    let out = "";
+
+    // Graticule. Wide spacing and very low ink: it should be felt at a glance
+    // and only actually resolve as lines if you look for it.
+    const STEP = 190;
+    for (let x = STEP; x < w; x += STEP) {
+      out += `<path class="gnd-grat" d="${freehand(x, -20, x, h + 20, rnd, 5)}"/>`;
+    }
+    for (let y = STEP; y < h; y += STEP) {
+      out += `<path class="gnd-grat" d="${freehand(-20, y, w + 20, y, rnd, 5)}"/>`;
+    }
+
+    // Bearing nodes with rhumb lines fanning out — the single most recognisable
+    // mark on a portolan chart, and the reason those charts look like charts.
+    const nodes = [
+      { x: w * 0.22, y: h * 0.30, r: 46 },
+      { x: w * 0.74, y: h * 0.72, r: 38 },
+    ];
+    for (const nd of nodes) {
+      const reach = Math.hypot(w, h);
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        out += `<path class="gnd-rhumb ${i % 4 === 0 ? "gnd-rhumb-main" : ""}"
+          d="${freehand(nd.x, nd.y, nd.x + Math.cos(a) * reach, nd.y + Math.sin(a) * reach, rnd, 7, 14)}"/>`;
+      }
+      // A plain double ring at the node. No lettering and no star points: at
+      // this opacity they would only turn to mud, and the fan already reads.
+      out += `<path class="gnd-ring" d="${freehandRing(nd.x, nd.y, nd.r, rnd)}"/>`;
+      out += `<path class="gnd-ring" d="${freehandRing(nd.x, nd.y, nd.r * 0.62, rnd)}"/>`;
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const r0 = nd.r * 0.62, r1 = nd.r;
+        out += `<path class="gnd-ring" d="${freehand(
+          nd.x + Math.cos(a) * r0, nd.y + Math.sin(a) * r0,
+          nd.x + Math.cos(a) * r1, nd.y + Math.sin(a) * r1, rnd, 0.8, 2)}"/>`;
+      }
+    }
+
+    return out;
+  }
+
+  return { plate, plateCrop, compassRose, rhumbLines, galleon, seaSerpent, ouroboros,
+    pageGround };
 })();

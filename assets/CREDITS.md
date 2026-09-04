@@ -9,29 +9,36 @@ Supplied by the project owner.
 | `sea-monster.webp` | lone sea monster, antique map detail | masthead marginalia |
 | `sea-serpent.webp` | sea serpent | masthead marginalia |
 | `ouroboros.webp` | serpent taking its tail | unused |
-| `an-old-map-of-the-world-with-a-map-of-the-world-photo.jpg` | source for the page ground | not rendered directly |
-| `map-backdrop.jpg` | the page ground | `body` background, once, at `cover` |
+| `an-old-map-of-the-world-with-a-map-of-the-world-photo.jpg` | unused — see below | not rendered |
 | `paper-fibre.png` | paper tooth | `body` background, tiled |
 
-## Why the page ground is one big image plus procedural noise
+## Why the page ground is drawn rather than photographed
 
-The obvious move was to cut a seamless tile out of the reference photograph
-and repeat it. That fails, and the reason is worth writing down: the
-photograph is *of a map*. Every patch of it carries drawn coastline, a rhumb
-line or lettering, so any tile cut from it repeats recognisable content — the
-result reads as patterned wallpaper with an obvious grid, not as paper. A
-stddev sweep did find the flattest region (around x=240,y=240, mean
-rgb(176,139,78), the tone `--parchment` is taken from), but "flattest" there
-still meant visible drawing.
+The reference photograph was used as the page background for one iteration and
+removed. It is worth writing down why, because the idea keeps looking good on
+paper.
 
-So the photograph is used **once**, upscaled and softened to `map-backdrop.jpg`
-and baked 62% toward `--parchment` so text laid over it stays readable. One
-image at `cover` has no seam to find.
+Tiling it fails first: the photograph is *of a map*, so every patch of it
+carries drawn coastline, a rhumb line or lettering. Any tile cut from it
+repeats recognisable content and reads as patterned wallpaper. A stddev sweep
+did find its flattest region — around x=240,y=240, mean rgb(176,139,78), which
+is where `--parchment` comes from — but "flattest" there still meant visible
+drawing.
 
-Paper *tooth* is a separate problem and does tile, because tooth is just fine
-noise and noise wraps by construction. `paper-fibre.png` is 256px of seeded
-Gaussian noise, generated rather than sampled, so it carries no content to
-recognise.
+Using it once at `cover` fixes the repeat and still fails, for a worse reason:
+it arrives carrying its own coastlines, its own graticule at its own angle and
+its own lettering, none of which agree with the chart laid on top of it. Two
+maps at two scales pointing two ways read as a collision, not as a surface.
+
+What actually reads as "old map" is not any particular map. It is a handful of
+marks — a graticule, rhumb lines fanning from bearing nodes — and the fact that
+a hand ruled them and got them slightly wrong. So `CHROME.pageGround` draws
+those, at this page's own scale, faint enough to sit under the content, with
+every line pushed off true by an amount that peaks at its middle and falls to
+zero at its ends, which is how a hand-ruled line actually fails.
+
+The photograph is kept in `assets/` as the source the parchment tone was
+sampled from.
 
 ## Why the galleon is a baked cutout, not a live crop
 

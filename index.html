@@ -74,6 +74,12 @@
        to the page's outer margins, bleeding off the edge, and cropped via
        object-position so only the creature shows — the Münster plate has a ship
        in its right half, so it is framed to the monster alone. -->
+  <!-- The page ground: graticule and rhumb lines, drawn freehand by
+       CHROME.pageGround at load. Sliced to cover the viewport and fixed, so it
+       is the sheet the page is printed on rather than part of the document. -->
+  <svg class="ground" id="ground" viewBox="0 0 1600 1000"
+       preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+
   <div class="marginalia" aria-hidden="true">
     <img class="marg marg-serpent" src="assets/sea-serpent.webp" alt="" />
     <img class="marg marg-monster" src="assets/sea-monster.webp" alt="" />
