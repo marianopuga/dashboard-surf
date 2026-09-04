@@ -796,8 +796,12 @@ a:hover { color: var(--coffee-deep); }
 .pin.is-best .dot-star { fill: var(--coffee); stroke: var(--parchment-lit); stroke-width: 1.3; }
 .pin.is-best.q-epic .dot-star,
 .pin.is-best.q-pumping .dot-star { fill: var(--raisin); }
-.pin.is-best.q-flat .dot-star { fill: none; stroke: var(--coffee-mid); stroke-width: 1.6; }
-.pin.is-best.q-flat .star-glow { display: none; }
+/* A flat hour is told by a lighter fill, never by a hollow star. Outlining it
+   read as an unfinished or broken mark rather than as a quieter one — the star
+   is the map's single "go here", and it should always look like a mark that
+   was made on purpose. */
+.pin.is-best.q-flat .dot-star { fill: var(--coffee-mid); stroke: var(--parchment-lit); }
+.pin.is-best.q-flat .star-glow { opacity: 0.10; }
 @keyframes star-breathe {
   0%,100% { opacity: 0.10; transform: scale(0.94); }
   50%     { opacity: 0.30; transform: scale(1.14); }

@@ -338,34 +338,46 @@ function crestField(from) {
   return out;
 }
 
-// The fleet. Fixed points in open water, chosen against the geography rather
-// than derived from the spots: every one sits east of the shoreline's furthest
-// point (x≈193, at Long Reef) and clear of both the pin cluster and the
-// cartouche, so no ship can ever land on a reading. `drift` is how far it
-// wanders and `dur` how long one round trip takes — slow enough to notice only
-// if you watch, which is the point.
-// The fleet. Only size and posture are fixed here — where each ship is and
-// where it is going is decided per voyage, at run time (see sailFleet).
+// The fleet. Only size and posture are fixed here — a ship's position and its
+// course are decided per voyage, at run time (see sailFleet).
+//
 // `rot` and `flip` exist to break up the formation: three copies of one plate
 // at one angle read as clip-art rather than as ships that happen to be out
-// there.
+// there. `roll` and `heave` are deliberately not multiples of each other — two
+// motions on periods that do not divide evenly never come back into the same
+// relationship, so the combined movement does not repeat, which is what stops
+// it reading as a mechanism.
 const FLEET = [
-  // 74 was too wide: the sea lane is only ~90 units across, so the largest
-  // hull filled it and left nothing for the water either side of it.
-  // `roll` and `heave` are deliberately not multiples of each other. Two
-  // motions on periods that do not divide evenly never come back into the same
-  // relationship, so the combined movement does not repeat — which is what
-  // stops it reading as a mechanism. A single sine at one frequency is a
-  // metronome no matter how small you make it.
+  // The sea lane is only ~90 units across, so no hull can be much wider than
+  // this without filling it and leaving no water either side.
   { w: 66, rot: -4, flip: false, roll: 11,  heave: 7.3 },
   { w: 52, rot: 6,  flip: true,  roll: 8.5, heave: 5.9 },
   { w: 43, rot: -8, flip: false, roll: 7,   heave: 4.7 },
 ];
 
-// The water a ship may sail in: east of the shoreline's furthest point
-// (x≈193, at Long Reef) and stopping short of the cartouche in the bottom
-// corner, so no hull ever crosses a reading.
-const SEA_LANE = { x0: 214, x1: 302, y0: 20, y1: 505 };
+// The water a ship may sail in. `x` is east of the shoreline's furthest point
+// (x≈193, at Long Reef); `y` runs from below the chart to above it, so a ship
+// makes the whole length of the coast — enters at the bottom of the plate,
+// works all the way north, and thins out at the top.
+//
+// It used to be cut into bands a fifth of that long, which is what made the
+// movement wrong: a hull appeared, crept 143 of the chart's 667 units, and
+// vanished having got nowhere. Bands were there to stop two ships colliding in
+// a lane too narrow to pass in; that job now belongs to spacing them in time
+// (see DEPART_GAP), which is how ships on one course actually stay apart.
+const SEA_LANE = { x0: 214, x1: 302, y0: -10, y1: 715 };
+
+// Every ship makes way at very nearly the same speed, in chart units per
+// second. This is what keeps a convoy in one lane safe: give hulls independent
+// durations and a fast one eventually overtakes a slow one from behind. The
+// spread is small enough that over a whole passage the quickest closes only
+// ~70 units on the slowest, against a departure gap worth several hundred.
+const SHIP_SPEED = 4.2;
+const SHIP_SPEED_SPREAD = 0.08;
+// Seconds between one departure and the next being allowed. At SHIP_SPEED this
+// is 250–400 units of clear water between consecutive hulls, against a tallest
+// hull of 66 * 1.246 = 82.
+const DEPART_GAP = [60, 95];
 
 /** The fleet's DOM, kept across re-renders so voyages are never restarted. */
 let FLEET_NODE = null;
@@ -447,32 +459,14 @@ function sailFleet(svg) {
 
   const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 
-  // The lane is only ~90 units wide and the largest hull is most of that, so
-  // two ships cannot pass each other side by side — left to pick freely they
-  // drift into the same water and collide, which looks like a rendering fault
-  // rather than like shipping. So the lane is cut into bands and a ship claims
-  // one for the whole voyage; which band it gets is still random among those
-  // free, and a ship waiting over the horizon holds nothing.
-  //
-  // Two numbers here are what actually keep hulls apart, and the first attempt
-  // got both wrong:
-  //
-  //   BAND_PAD  Ships travel only the middle of their band. Without it a ship
-  //             reaches full opacity ~18% into its run, which was still inside
-  //             the neighbouring band, so two hulls were solid and touching at
-  //             the boundary. The pad guarantees 2*BAND_PAD of clear water
-  //             between any two visible ships; the tallest hull is 60*1.246 =
-  //             75 units, so two half-heights is 75 and 100 clears it.
-  //
-  //   BANDS     Fewer bands than ships. Three bands over this lane left each
-  //             one too short to sail once padded, and every ship was always
-  //             on screen. With two, each voyage gets real distance and one of
-  //             the three hulls is always over the horizon — so which ships
-  //             are out, and where, keeps changing.
-  const BANDS = 2;
-  const BAND_PAD = 50;
-  const bandH = (SEA_LANE.y1 - SEA_LANE.y0) / BANDS;
-  const taken = new Set();
+  // One shared lane, so ships are kept apart in TIME rather than in space: a
+  // departure is only allowed once enough of it has passed since the last one.
+  // This is how a line of ships on one course actually stays clear, and unlike
+  // the old bands it costs a ship nothing — each one still makes the entire
+  // length of the coast.
+  let lastDeparture = -Infinity;
+
+  const RUN = SEA_LANE.y1 - SEA_LANE.y0;
 
   svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
     const beam = FLEET[i].w * 0.5;   // keep the hull off the lane's edges
@@ -480,64 +474,78 @@ function sailFleet(svg) {
     let seeded = false;
     let current = null;
 
-    const voyage = () => {
-      const free = [];
-      for (let b = 0; b < BANDS; b++) if (!taken.has(b)) free.push(b);
-      if (!free.length) return void setTimeout(voyage, rand(4000, 14000));
-      const band = free[Math.floor(Math.random() * free.length)];
-      taken.add(band);
+    // Where this ship is along its first passage, so the three are strung out
+    // up the coast on the very first frame instead of abreast. All three sit
+    // inside the visible stretch (0.32 to 1.0) — seeding one at 0.1 put it
+    // south of the cartouche, where it is deliberately still invisible, and
+    // the page opened with two ships instead of three.
+    const SEED_AT = [0.84, 0.62, 0.4][i];
 
-      // Every ship works north, up the coast. Alternating the direction at
-      // random was what made the movement read wrong: with two hulls on screen
-      // one would slide up while the other slid down, which no fleet does, and
-      // a ship reversing its course on its next voyage looked like a glitch
-      // rather than a passage. Both ends stay strictly inside the padded band,
-      // so a hull is never solid anywhere near a neighbouring band's water.
-      const top = SEA_LANE.y0 + band * bandH + BAND_PAD;
-      const bot = SEA_LANE.y0 + (band + 1) * bandH - BAND_PAD;
-      // One track, not two independent draws. Picking the start and finish x
-      // separately let a ship crab sideways across the lane as it went; a
-      // couple of units of lateral wander is a course held in a seaway.
+    const voyage = () => {
+      const now = performance.now();
+      // The gap gate does not apply to the opening voyage: those are already
+      // part-way along, so they were "dispatched" at staggered times in the
+      // past, and making them queue would leave the sea empty for a minute.
+      if (seeded) {
+        const wait = lastDeparture + rand(...DEPART_GAP) * 1000 - now;
+        if (wait > 0) return void setTimeout(voyage, wait);
+      }
+
+      // North, always. Alternating the direction at random was what made the
+      // movement read wrong: with several hulls on screen one would slide up
+      // while another slid down, which no fleet does.
+      //
+      // One track, not two independent draws — picking the start and finish x
+      // separately let a ship crab sideways across the lane as it went. A
+      // couple of units of wander is a course held in a seaway.
       const trackX = lane();
-      const driftX = trackX + rand(-4, 4);
+      const driftX = trackX + rand(-5, 5);
+      const speed = SHIP_SPEED * rand(1 - SHIP_SPEED_SPREAD, 1 + SHIP_SPEED_SPREAD);
+      const dur = (RUN / speed) * 1000;
+
       // Element.animate() *adds* an animation; the previous one keeps filling
       // forever otherwise, so they accumulate one per voyage for as long as the
       // page is open. Retire it explicitly.
       if (current) current.cancel();
       const anim = g.animate(
         [
-          { transform: `translate(${trackX.toFixed(1)}px,${bot.toFixed(1)}px)`, opacity: 0 },
-          { opacity: 1, offset: 0.14 },
-          { opacity: 1, offset: 0.76 },
-          // A long fade at the head of the run: the ship should thin out into
-          // the distance over the last quarter of its passage, not switch off.
-          { transform: `translate(${driftX.toFixed(1)}px,${top.toFixed(1)}px)`, opacity: 0 },
+          { transform: `translate(${trackX.toFixed(1)}px,${SEA_LANE.y1}px)`, opacity: 0 },
+          // Held invisible until the hull is north of the cartouche. The lane
+          // is 214–302 and the cartouche spans 192–310, so a ship coming up
+          // from the bottom passes clean behind it — and since the cartouche is
+          // opaque and drawn last, what showed was a set of mastheads sticking
+          // out above the box with no ship under them. Nothing can be moved
+          // aside to fix that (the cartouche is wider than the whole lane), so
+          // the ship simply comes into view once it is past.
+          // 0.32 puts the largest hull's keel at y=524 against the
+          // cartouche's top edge at 537 — measured, not guessed: at 0.20 the
+          // ship was still half in the box while fading up.
+          { opacity: 0, offset: 0.32 },
+          { opacity: 1, offset: 0.4 },
+          { opacity: 1, offset: 0.78 },
+          // Thins out into the distance over the top fifth of the chart rather
+          // than switching off. The fade has to finish while the ship is still
+          // ON the plate — run it past the top edge and the ship simply slides
+          // out of the viewBox at full strength, which is a clip, not a
+          // disappearance.
+          { transform: `translate(${driftX.toFixed(1)}px,${SEA_LANE.y0}px)`, opacity: 0 },
         ],
-        // Slow. This is a ship seen from a long way off, not a boat crossing a
-        // pond: ~140 units in two to three and a half minutes works out under
-        // a pixel a second on screen, which is movement you notice only if you
-        // stay with it.
-        { duration: rand(115000, 205000), easing: "linear", fill: "forwards" }
+        { duration: dur, easing: "linear", fill: "forwards" }
       );
       current = anim;
-      // The very first voyage starts part-way through, at a point that is
-      // already past the fade-in, so ships are visible on the first frame.
-      // Every voyage after this one begins at its start, as it should.
       if (!seeded) {
         seeded = true;
-        anim.currentTime = anim.effect.getTiming().duration * rand(0.22, 0.7);
+        anim.currentTime = dur * SEED_AT;
+        // Backdate the departure to when this ship would actually have sailed,
+        // so the first scheduled departure after the openers still lands a full
+        // gap behind the most recent of them.
+        lastDeparture = Math.max(lastDeparture, now - dur * SEED_AT);
+      } else {
+        lastDeparture = now;
       }
-      // A pause over the horizon before the next one, so the sea is sometimes
-      // emptier than it is now and the reappearance is not on a beat.
-      anim.onfinish = () => {
-        taken.delete(band);
-        setTimeout(voyage, rand(6000, 20000));
-      };
+      anim.onfinish = () => setTimeout(voyage, rand(2000, 12000));
     };
 
-    // Sail immediately, and start the first voyage already under way (see
-    // `seeded` above) so the sea has ships on it the moment the page opens
-    // rather than a minute later.
     voyage();
   });
 }
@@ -674,10 +682,10 @@ function renderChart(rows, cond, activeId) {
     return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""} ${isBest ? "is-best" : ""}"
               data-spot="${spot.id}"
               transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})">
-        <circle class="halo" r="${isBest ? 15 : 9}"/>
+        <circle class="halo" r="${isBest ? 17 : 9}"/>
         ${isBest
-          ? `<path class="star-glow" d="${starPath(0, 0, 17)}"/>
-             <path class="dot dot-star" d="${starPath(0, 0, 11.5)}"/>`
+          ? `<path class="star-glow" d="${starPath(0, 0, 20)}"/>
+             <path class="dot dot-star" d="${starPath(0, 0, 13.5)}"/>`
           : `<circle class="dot" r="4.5"/>`}
       </g>`;
   });
