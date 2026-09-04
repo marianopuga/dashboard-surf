@@ -294,18 +294,30 @@ const CHROME = (() => {
    * and falls to zero at both ends — a hand is accurate where it starts and
    * where it aims, and drifts in between.
    */
-  function freehand(x1, y1, x2, y2, rnd, wobble = 4, seg = 10) {
+  function freehandPts(x1, y1, x2, y2, rnd, wobble = 4, seg = 10) {
     const dx = x2 - x1, dy = y2 - y1;
     const len = Math.hypot(dx, dy) || 1;
     const px = -dy / len, py = dx / len;
     const bias = (rnd() * 2 - 1) * wobble;   // the whole line's lean
-    let d = "";
+    const pts = [];
     for (let i = 0; i <= seg; i++) {
       const t = i / seg;
       const off = Math.sin(t * Math.PI) * (bias + (rnd() * 2 - 1) * wobble * 0.5);
-      d += `${i ? "L" : "M"}${n(x1 + dx * t + px * off)} ${n(y1 + dy * t + py * off)}`;
+      pts.push({ x: x1 + dx * t + px * off, y: y1 + dy * t + py * off, nx: px, ny: py });
     }
-    return d;
+    return pts;
+  }
+  const pathOf = (pts) =>
+    pts.map((p, i) => `${i ? "L" : "M"}${n(p.x)} ${n(p.y)}`).join("");
+  function freehand(x1, y1, x2, y2, rnd, wobble = 4, seg = 10) {
+    return pathOf(freehandPts(x1, y1, x2, y2, rnd, wobble, seg));
+  }
+  /** Point on a sampled polyline at parameter t in [0,1], with its normal. */
+  function along(pts, t) {
+    const f = t * (pts.length - 1);
+    const i = Math.min(pts.length - 2, Math.floor(f)), k = f - i;
+    const a = pts[i], b = pts[i + 1];
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, nx: a.nx, ny: a.ny };
   }
 
   /** A ring drawn by hand: radius breathes a little as it goes round. */
@@ -327,14 +339,37 @@ const CHROME = (() => {
     const rnd = rng(seed);
     let out = "";
 
-    // Graticule. Wide spacing and very low ink: it should be felt at a glance
-    // and only actually resolve as lines if you look for it.
+    // Graticule — the meridians and parallels every map has — with graduations
+    // along each one. Both are generated from the *same* sampled polyline: the
+    // ticks are hung off the line's own normal at a fixed clearance, so they
+    // follow wherever the hand-drawn line actually wandered.
+    //
+    // That coupling is the point. The first attempt placed ticks at a fixed
+    // offset from the line's *nominal* position, which ignored the 5-unit
+    // wobble the freehand pass applies — so the line meandered across them and
+    // five ticks ended up crossing it. Where a tick crosses a line the ink
+    // doubles (0.30 over 0.26 composites to ~0.48), and the masthead and
+    // colophon type sits directly on this ground: over one line that type holds
+    // 4.9:1, over a crossing it drops to about 4.1:1. Hanging the ticks off the
+    // real path means there is no crossing to fall into.
     const STEP = 190;
-    for (let x = STEP; x < w; x += STEP) {
-      out += `<path class="gnd-grat" d="${freehand(x, -20, x, h + 20, rnd, 5)}"/>`;
-    }
-    for (let y = STEP; y < h; y += STEP) {
-      out += `<path class="gnd-grat" d="${freehand(-20, y, w + 20, y, rnd, 5)}"/>`;
+    const GAP = 1.6;      // clear of the graticule's own 1.1-unit stroke
+    const DIV = 4;        // graduations per interval
+
+    const rules = [];
+    for (let x = STEP; x < w; x += STEP) rules.push(freehandPts(x, -20, x, h + 20, rnd, 5));
+    for (let y = STEP; y < h; y += STEP) rules.push(freehandPts(-20, y, w + 20, y, rnd, 5));
+
+    for (const pts of rules) {
+      out += `<path class="gnd-grat" d="${pathOf(pts)}"/>`;
+      const spans = Math.round(Math.hypot(
+        pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y) / (STEP / DIV));
+      for (let k = 1; k < spans; k++) {
+        const p = along(pts, k / spans);
+        const t = k % DIV === 0 ? 8 : 4;         // longer mark on the whole degree
+        out += `<path class="gnd-tick" d="M${n(p.x + p.nx * GAP)} ${n(p.y + p.ny * GAP)}
+          L${n(p.x + p.nx * (GAP + t))} ${n(p.y + p.ny * (GAP + t))}"/>`;
+      }
     }
 
     // Bearing nodes with rhumb lines fanning out — the single most recognisable

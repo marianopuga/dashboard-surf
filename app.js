@@ -477,6 +477,8 @@ function sailFleet(svg) {
   svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
     const beam = FLEET[i].w * 0.5;   // keep the hull off the lane's edges
     const lane = () => rand(SEA_LANE.x0 + beam, SEA_LANE.x1 - beam);
+    let seeded = false;
+    let current = null;
 
     const voyage = () => {
       const free = [];
@@ -491,6 +493,10 @@ function sailFleet(svg) {
       const top = SEA_LANE.y0 + band * bandH + BAND_PAD;
       const bot = SEA_LANE.y0 + (band + 1) * bandH - BAND_PAD;
       const northbound = Math.random() < 0.5;
+      // Element.animate() *adds* an animation; the previous one keeps filling
+      // forever otherwise, so they accumulate one per voyage for as long as the
+      // page is open. Retire it explicitly.
+      if (current) current.cancel();
       const anim = g.animate(
         [
           { transform: `translate(${lane().toFixed(1)}px,${(northbound ? bot : top).toFixed(1)}px)`,
@@ -506,6 +512,14 @@ function sailFleet(svg) {
         // stay with it.
         { duration: rand(115000, 205000), easing: "linear", fill: "forwards" }
       );
+      current = anim;
+      // The very first voyage starts part-way through, at a point that is
+      // already past the fade-in, so ships are visible on the first frame.
+      // Every voyage after this one begins at its start, as it should.
+      if (!seeded) {
+        seeded = true;
+        anim.currentTime = anim.effect.getTiming().duration * rand(0.22, 0.7);
+      }
       // A pause over the horizon before the next one, so the sea is sometimes
       // emptier than it is now and the reappearance is not on a beat.
       anim.onfinish = () => {
@@ -514,9 +528,10 @@ function sailFleet(svg) {
       };
     };
 
-    // Stagger the first departures, otherwise all three set out together on
-    // load and the whole point is lost in the first minute.
-    setTimeout(voyage, rand(0, 4000));
+    // Sail immediately, and start the first voyage already under way (see
+    // `seeded` above) so the sea has ships on it the moment the page opens
+    // rather than a minute later.
+    voyage();
   });
 }
 

@@ -41,13 +41,17 @@
                                4.2:1 once the ground went from Salt to
                                parchment — it read fine on near-white and
                                failed AA on tan.                           */
-  --ink-on-ground: #4E4A38; /* 4.9:1 on bare --parchment. Most muted text sits
-                               on a panel, where --ink-muted is comfortable;
-                               the masthead, the sheet heading and the
-                               colophon do not, and out there --ink-muted is
-                               4.2:1 — under AA. One step darker rather than
-                               lightening the whole ground further, which
-                               would have flattened the panels into it.    */
+  --ink-on-ground: #2E2F23; /* = --ink-body. The masthead, the sheet heading
+                               and the colophon sit on the bare ground, which
+                               now carries a full-strength graticule, and the
+                               background under a letter there can be a line
+                               rather than plain parchment. Measured: over a
+                               0.30 line, --ink-muted is 3.2:1 and the previous
+                               #4E4A38 is 3.6:1 — both under AA — while body
+                               ink holds 4.9:1. Kept as its own token because
+                               it is a decision about the ground, not about
+                               body copy, and the two move for different
+                               reasons.                                    */
                             /* (raw Antique is 3.3:1 — fine for lines and
                                graphics, too weak for small text)          */
 
@@ -104,17 +108,28 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+  /* The linework runs at full strength across the whole page rather than being
+     quieted under the content, because there is nothing to quiet it for: every
+     block sits on opaque paper except the masthead, the sheet heading and the
+     colophon, and those three take --ink-on-ground, which is dark enough to
+     hold 4.9:1 over a line.
+
+     A wash under those three was tried instead and reverted — 95% opaque
+     parchment behind the masthead is wide enough to cover both sea creatures,
+     and it erased them completely. */
 }
+
 .gnd-grat {
   fill: none;
   stroke: var(--coffee);
   stroke-width: 1.1;
-  opacity: 0.11;
+  opacity: 0.30;
   stroke-linecap: round;
 }
-.gnd-rhumb { fill: none; stroke: var(--coffee); stroke-width: 0.8; opacity: 0.055; }
-.gnd-rhumb-main { stroke-width: 1; opacity: 0.09; }
-.gnd-ring { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.12; }
+.gnd-tick { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.26; stroke-linecap: round; }
+.gnd-rhumb { fill: none; stroke: var(--coffee); stroke-width: 0.8; opacity: 0.15; }
+.gnd-rhumb-main { stroke-width: 1; opacity: 0.24; }
+.gnd-ring { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.34; }
 
 .marginalia {
   position: fixed;
@@ -672,6 +687,13 @@ a:hover { color: var(--coffee-deep); }
 }
 .ship-line { fill: none; stroke: var(--olive); stroke-width: 0.35; opacity: 0.7; }
 .ship-flag { fill: var(--coffee); }
+/* Hidden until a voyage takes charge of it. A ship between voyages — or one
+   waiting for a band to come free — has no animation driving its transform, so
+   without this it renders at the untransformed origin, which is a corner of the
+   chart, not open sea. The animation sets opacity from its own keyframes and
+   fills forwards, so it owns this the moment it starts. */
+.ship-voyage { opacity: 0; }
+
 /* The settled water a hull sits in. Same colour as the sea, so it reads as
    water rather than as a patch: opaque at the centre, gone by the edge. */
 .clearing-in  { stop-color: var(--paper-raised); stop-opacity: 1; }
