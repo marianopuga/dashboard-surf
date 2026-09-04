@@ -747,7 +747,11 @@ a:hover { color: var(--coffee-deep); }
 /* The swell window: an arc showing which bearings this beach can actually see.
    Only drawn for the active spot — eleven of these at once is noise. */
 .window-wedge { fill: var(--coffee); opacity: 0.13; }
-.window-edge  { stroke: var(--coffee); stroke-width: 0.85; opacity: 0.45; fill: none; stroke-dasharray: 3 2.5; }
+/* The two edges of the beach's swell window, and the shore-normal it is read
+   against, are the only construction lines on the chart — they say what the
+   arrow beside them means. At 0.45 they were fainter than the depth contours
+   behind them, which put the explanation below the decoration. */
+.window-edge  { stroke: var(--coffee); stroke-width: 1; opacity: 0.72; fill: none; stroke-dasharray: 3 2.5; }
 
 /* ==========================================================================
    Pirate chart chrome — compass rose, rhumb lines, ship, sea monster
@@ -986,7 +990,7 @@ a:hover { color: var(--coffee-deep); }
   fill: var(--ink-muted);
 }
 .tide-val { font-family: var(--mono); font-size: 11px; fill: var(--ink-muted); }
-.shore-normal { stroke: var(--olive); stroke-width: 1; stroke-dasharray: 1.5 2.5; opacity: 0.8; }
+.shore-normal { stroke: var(--noir); stroke-width: 1.15; stroke-dasharray: 1.5 2.5; opacity: 0.9; }
 
 /* ==========================================================================
    Verdict — the answer, given card weight
