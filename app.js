@@ -851,22 +851,11 @@ function renderChart(rows, cond, activeId) {
   svg.querySelectorAll(".pin").forEach((g) => {
     const id = g.dataset.spot;
     g.addEventListener("click", () => selectSpot(id, true));
-    g.addEventListener("mouseenter", () => previewSpot(id));
+    g.addEventListener("mouseenter", () => selectSpot(id, false));
   });
 
-  svg.addEventListener("mouseleave", clearPreview);
-
-  // Say which mode the map is in, because the difference matters: following
-  // means the arrows will move to another beach as you scrub, pinned means
-  // they will not.
   const activeSpot = SPOTS.find((s) => s.id === activeId);
-  const head = document.getElementById("chart-active");
-  head.textContent = activeSpot
-    ? `${activeSpot.name}${STATE.pinnedId ? " · pinned" : " · best"}`
-    : "—";
-  head.title = STATE.pinnedId
-    ? "Pinned to this spot. Click it on the map again to follow the best spot."
-    : "Following the best spot at the selected hour. Click a spot to pin it.";
+  document.getElementById("chart-active").textContent = activeSpot?.name ?? "—";
   renderMapFooter(activeSpot, cond);
 }
 
@@ -1249,8 +1238,7 @@ function renderSheet(rows, cond, slots, tideModel) {
       btn.setAttribute("aria-expanded", String(!open));
       selectSpot(li.dataset.spot, false);
     });
-    btn.addEventListener("mouseenter", () => previewSpot(li.dataset.spot));
-    btn.addEventListener("mouseleave", clearPreview);
+    btn.addEventListener("mouseenter", () => selectSpot(li.dataset.spot, false));
   });
 
   sheet.querySelectorAll("[data-week]").forEach((btn) => {
@@ -1295,52 +1283,24 @@ function renderSheet(rows, cond, slots, tideModel) {
 // land 34 minutes off that grid, silently mismatching the tile the slider
 // claims to be on and printing a ":00" label that was never quite true.
 // Offset 0 stays exact — it always reads Date.now() directly, live.
-// Which spot the chart's arrows belong to. `pinnedId` is null by default,
-// which means FOLLOW THE RECOMMENDATION: scrubbing the time bar walks the
-// arrows from spot to spot as the best spot changes, so the map answers "where
-// should I go at this hour" rather than "what is this one beach doing". Click
-// a spot and it pins there instead, and the slider then tells you that one
-// spot's story through time; click it again to hand the map back.
+// Which spot the chart's arrows belong to. Seeded on load to whichever spot is
+// best at that moment, and thereafter it only changes when you pick one.
 //
-// `hoverId` is separate on purpose. Hovering used to set the selection, which
-// would now mean brushing across the map silently pinned whatever you passed
-// over. It is a preview: it overrides both while the cursor is on a spot and
-// is dropped the moment it leaves.
+// Making the arrows FOLLOW the recommendation as the time bar moved was tried
+// and taken out: the arrows jumped from beach to beach mid-scrub, which reads
+// as the map twitching rather than as an answer. The bar is for watching one
+// spot through time; where to go is the verdict card's job and the X's.
 let STATE = { rows: [], swell: {}, wind: {}, tideModel: null, hours: null, slots: null,
-  pinnedId: null, hoverId: null, bestId: null,
-  hourOffset: 0, baseMs: Math.floor(Date.now() / FORECAST.HOUR_MS) * FORECAST.HOUR_MS };
+  activeId: null, hourOffset: 0, baseMs: Math.floor(Date.now() / FORECAST.HOUR_MS) * FORECAST.HOUR_MS };
 
-/** The spot the chart is currently showing arrows for. */
-const activeSpotId = () => STATE.hoverId ?? STATE.pinnedId ?? STATE.bestId;
-
-/** Repaint the chart and the sheet's highlight for whatever is active now. */
-function paintActive(scrollTo) {
-  const id = activeSpotId();
+function selectSpot(id, scroll) {
+  if (STATE.activeId === id && !scroll) return;
+  STATE.activeId = id;
   const { cond } = condAt(STATE.hourOffset);
   renderChart(STATE.rows, cond, id);
   document.querySelectorAll(".spot").forEach((li) =>
     li.classList.toggle("is-active", li.dataset.spot === id));
-  if (scrollTo) document.getElementById(`spot-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-/** Click: pin the map to this spot, or release it if it is already pinned. */
-function selectSpot(id, scroll) {
-  STATE.pinnedId = STATE.pinnedId === id ? null : id;
-  STATE.hoverId = null;
-  paintActive(scroll && STATE.pinnedId != null);
-}
-
-/** Hover: show this spot without committing to it. */
-function previewSpot(id) {
-  if (STATE.hoverId === id) return;
-  STATE.hoverId = id;
-  paintActive(false);
-}
-
-function clearPreview() {
-  if (STATE.hoverId == null) return;
-  STATE.hoverId = null;
-  paintActive(false);
+  if (scroll) document.getElementById(`spot-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 async function fetchJson(url) {
@@ -1369,17 +1329,12 @@ function retime(offset) {
   const byOrder = rows.slice().sort((a, b) => a.spot.order - b.spot.order);
   STATE.rows = byOrder;
 
-  // The recommendation moves as the hour moves, and with nothing pinned the
-  // chart follows it — this is what makes scrubbing the bar show you where to
-  // go rather than only what one beach is doing.
-  STATE.bestId = best.spot.id;
-
   renderVerdict(best, cond, ms, isMeasured, STATE.tideModel);
   updateSheetForTime(byOrder, cond);
   updateForecastHighlight(ms);
-  renderChart(byOrder, cond, activeSpotId());
+  renderChart(byOrder, cond, STATE.activeId ?? best.spot.id);
   renderTimeControl(offset, ms, isMeasured);
-  document.querySelector(`.spot[data-spot="${activeSpotId()}"]`)?.classList.add("is-active");
+  document.querySelector(`.spot[data-spot="${STATE.activeId ?? best.spot.id}"]`)?.classList.add("is-active");
 }
 
 /** Patch the already-rendered rows in place: dial, readouts, badge, meters. */
@@ -1470,9 +1425,9 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
   const seedRows = SPOTS.map((spot) => ({ spot, score: SCORE.scoreSpot(spot, seedCond) }))
     .sort((a, b) => a.spot.order - b.spot.order);
   renderSheet(seedRows, seedCond, STATE.slots, STATE.tideModel);
-  // Nothing is seeded as selected. The page opens FOLLOWING the recommendation
-  // rather than pinned to whichever spot happened to win on load — pinning it
-  // there was what stopped the arrows moving with the time bar.
+  STATE.activeId = STATE.activeId
+    ?? seedRows.slice().sort(SCORE.compareScored)[0].spot.id;
+
   retime(STATE.hourOffset);
 }
 

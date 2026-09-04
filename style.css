@@ -197,18 +197,32 @@
   aspect-ratio: 800 / 769;
   transform: translate(24%, 22%) rotate(5deg) scaleX(-1);
 }
-/* A little smaller than the other corner plates — it is a dense, busy image
-   (a whole creature plus three galleons) where the others are a single
-   creature, so at matched width it carried far more ink than its share. */
+/* Anchored so the galleon at the top of the plate lines up with the left edge
+   of the content column. The hull begins 38.3% across the image — measured off
+   the plate itself: columns 140-150 carry no ink and it resumes hard at 155 of
+   405 — so the plate is pulled back by exactly that fraction from the column
+   edge.
+
+   Its width then follows from the same number rather than being chosen. To put
+   the galleon on the column edge AND still run the plate's own left edge off
+   the window, the plate must be at least gutter / 0.383 wide; anything less and
+   a band of bare parchment opens up to its left, which is what happened when
+   the alignment was first added at a fixed width.
+
+   The `min(0px, ...)` is the graceful failure. Past the cap the equation would
+   start pushing the plate rightwards again, so instead it pins flush to the
+   window and the alignment drifts — a small misalignment reads as nothing, an
+   empty strip down the edge reads as a mistake. */
 .marg-kraken {
   left: 0;
-  width: clamp(110px, 23vw, 380px);
+  width: clamp(260px, calc((100vw - 1180px) / 0.766 + 24px), 900px);
   aspect-ratio: 405 / 390;
-  transform: translate(-14%, 20%) rotate(3deg);
+  transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 20%) rotate(3deg);
 }
+
 @media (min-width: 1400px) {
   .marg-dragon { transform: translate(12%, 16%) rotate(5deg) scaleX(-1); }
-  .marg-kraken { width: clamp(190px, 17vw, 345px); transform: translate(-4%, 15%) rotate(3deg); }
+  .marg-kraken { transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 15%) rotate(3deg); }
 }
 
 .marg-serpent {
