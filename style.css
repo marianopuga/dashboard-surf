@@ -625,7 +625,17 @@ a:hover { color: var(--coffee-deep); }
     #000 48%, rgba(0,0,0,0.45) 72%, transparent 90%);
 }
 .plate-rose { opacity: 1; }
-.plate-ship { opacity: 1; }
+/* The ship is the one plate that is a genuine alpha cutout — only ~20% of its
+   box is opaque and its border is empty, so it has no crop edge to hide. The
+   soft mask above was therefore not softening a boundary, it was dissolving
+   the hull itself: it starts fading at 48% of the box and is fully transparent
+   by 90%, which is exactly where the bow, the stern and the mastheads sit.
+   That is why the ships were washing out. */
+.plate-ship {
+  opacity: 1;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 .plate-monster { opacity: 0.7; }
 .plate-marg { opacity: 1; }
 

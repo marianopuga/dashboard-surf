@@ -352,9 +352,9 @@ function crestField(from) {
 const FLEET = [
   // 74 was too wide: the sea lane is only ~90 units across, so the largest
   // hull filled it and left nothing for the water either side of it.
-  { w: 60, rot: -4, flip: false, bob: 11 },
-  { w: 46, rot: 6,  flip: true,  bob: 9 },
-  { w: 37, rot: -8, flip: false, bob: 7.5 },
+  { w: 66, rot: -4, flip: false, bob: 11 },
+  { w: 52, rot: 6,  flip: true,  bob: 9 },
+  { w: 43, rot: -8, flip: false, bob: 7.5 },
 ];
 
 // The water a ship may sail in: east of the shoreline's furthest point
@@ -521,8 +521,8 @@ function sailFleet(svg) {
         [
           { transform: `translate(${lane().toFixed(1)}px,${(northbound ? bot : top).toFixed(1)}px)`,
             opacity: 0 },
-          { opacity: 0.95, offset: 0.18 },
-          { opacity: 0.95, offset: 0.82 },
+          { opacity: 1, offset: 0.18 },
+          { opacity: 1, offset: 0.82 },
           { transform: `translate(${lane().toFixed(1)}px,${(northbound ? top : bot).toFixed(1)}px)`,
             opacity: 0 },
         ],
@@ -536,13 +536,13 @@ function sailFleet(svg) {
       // emptier than it is now and the reappearance is not on a beat.
       anim.onfinish = () => {
         taken.delete(band);
-        setTimeout(voyage, rand(10000, 45000));
+        setTimeout(voyage, rand(6000, 20000));
       };
     };
 
     // Stagger the first departures, otherwise all three set out together on
     // load and the whole point is lost in the first minute.
-    setTimeout(voyage, rand(0, 9000));
+    setTimeout(voyage, rand(0, 4000));
   });
 }
 
