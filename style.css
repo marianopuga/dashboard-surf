@@ -220,9 +220,14 @@
    `min(0px, ...)` only guards the narrow end, where the gutter goes to zero. */
 .marg-kraken {
   left: 0;
-  /* +32px rather than +20: the rotation below swings the plate's top-left
-     corner very slightly inward, and the margin has to cover that too. */
-  width: max(260px, calc((100vw - 1180px) / 0.766 + 32px));
+  /* Sized from the SAME measured edge it aligns to. Deriving it from the
+     viewport instead — calc((100vw - 1180px) / 2) — is what kept the ship
+     short of the box: that is the column's border box, and the panels start
+     one padding further in. --panel-left is measured off a real panel in
+     app.js, so it cannot drift out of step with the padding rules.
+     +32px rather than +20: the rotation below swings the plate's top-left
+     corner very slightly inward and the margin has to cover that too. */
+  width: max(260px, calc(var(--panel-left, 0px) / 0.383 + 32px));
   aspect-ratio: 405 / 390;
   /* Pivot on the galleon itself, not the middle of the plate. Rotating about
      the centre moved the ship 7.2px sideways — 1.8% of the plate's width — and
@@ -231,12 +236,12 @@
      about the ship leaves the ship where it was put.
      38.3% across, 14.9% down: measured off the plate, not estimated. */
   transform-origin: 38.3% 14.9%;
-  transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 20%) rotate(3deg);
+  transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 20%) rotate(3deg);
 }
 
 @media (min-width: 1400px) {
   .marg-dragon { transform: translate(12%, 7%) rotate(5deg) scaleX(-1); }
-  .marg-kraken { transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 15%) rotate(3deg); }
+  .marg-kraken { transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 15%) rotate(3deg); }
 }
 
 .marg-serpent {
@@ -1346,10 +1351,26 @@ a:hover { color: var(--coffee-deep); }
 
 .colophon {
   border-top: 1px solid var(--rule);
-  padding: var(--s5) 0 var(--s8);
+  /* The deep bottom padding is the sea orm's berth: it is a wide, shallow
+     plate lying below the colophon's type, and without the room it would be
+     cut off by the end of the page. */
+  /* Deep enough that most of the sea orm lies clear of the type. Its height is
+     ~0.48 of the column width, so the room it needs tracks the column, not the
+     window — hence a vw figure with a cap rather than a fixed one. */
+  padding-top: var(--s5);
   font-size: var(--t-small);
   color: var(--ink-on-ground);
 }
+
+/* The sea orm's berth, deep enough that most of the plate lies clear of the
+   type. Its height is ~0.48 of the column width, so the room it needs tracks
+   the column rather than the window — hence a vw figure with a cap.
+   
+   It has to out-specify `.wrap`, which the colophon also carries: `.wrap` sets
+   the padding SHORTHAND, it appears later in this file (in the Responsive
+   block), and at equal specificity that reset padding-bottom to 0. Every
+   attempt to give the orm room silently did nothing because of it. */
+.colophon.wrap { padding-bottom: clamp(64px, 36vw, 420px); }
 /* The one heading that sits on the bare ground rather than on a panel. */
 #sheet-heading { color: var(--ink-on-ground); }
 
@@ -1373,12 +1394,26 @@ a:hover { color: var(--coffee-deep); }
      each side — and at full width that was enough to push the page into
      horizontal scroll. */
   left: 8px;
-  top: 50%;
+  /* Anchored to the FOOT of the colophon, not centred on it. Centring put the
+     creature behind the four columns of type, and positioning it by percentage
+     overhung the end of the page: the plate's height follows the column width
+     while the padding followed the viewport, so the two drifted apart and at
+     some widths it hung 100px past the last thing on the page. Pinned to the
+     bottom it cannot overhang at any width, whatever either of them does.
+     Its head and the ship still reach up behind the type, which is what ties
+     the picture to the block. */
+  /* `top: auto` is load-bearing: .marg sets `top: 8px` for the fixed corner
+     plates, and with a top, a bottom AND a height fixed by aspect-ratio the box
+     is over-constrained — the browser keeps `top` and drops `bottom`, which is
+     why pinning it to the foot appeared to do nothing and it still hung 123px
+     past the end of the page. */
+  top: auto;
+  bottom: 0;
   width: calc(100% - 16px);
   aspect-ratio: 887 / 427;
   z-index: -1;
   opacity: 0.32;
-  transform: translateY(-50%) rotate(-1deg);
+  transform: rotate(-1deg);
 }
 /* Below this the colophon collapses to a single narrow column and a 2.08:1
    plate behind it is too small to read as a picture. */

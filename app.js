@@ -1435,7 +1435,36 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
   retime(STATE.hourOffset);
 }
 
+/**
+ * Publish where the content column's VISIBLE edge actually is, as --panel-left.
+ *
+ * The kraken in the bottom-left margin is positioned so its galleon lines up
+ * with that edge, and every previous attempt computed it as
+ * `calc((100vw - 1180px) / 2)` — the wrap's border box. That is not where the
+ * panels start: they begin one padding further in, and the padding changes with
+ * the viewport. So the ship was landing a fixed distance short at every width,
+ * and each "fix" was refining the wrong target.
+ *
+ * Measured rather than derived, because the value depends on padding that
+ * lives in media queries; anything computed in CSS has to duplicate those
+ * rules and will drift the moment one of them changes.
+ */
+function publishColumnEdge() {
+  const panel = document.querySelector(".conditions") || document.querySelector(".wrap");
+  if (!panel) return;
+  const x = Math.max(0, Math.round(panel.getBoundingClientRect().left));
+  document.documentElement.style.setProperty("--panel-left", `${x}px`);
+}
+
 async function main() {
+  publishColumnEdge();
+  // Re-measured on resize: the column's inner edge moves with the viewport and
+  // with whichever padding rule is in force at that width.
+  let resizeTimer;
+  addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(publishColumnEdge, 120);
+  });
   for (const spot of SPOTS) spot.xy = snapToShore(project(spot.lat, spot.lng));
   // Drawn once and never touched again — it does not depend on any data, so
   // no repaint, no slider tick and no fetch can cost anything here.
