@@ -220,8 +220,17 @@
    `min(0px, ...)` only guards the narrow end, where the gutter goes to zero. */
 .marg-kraken {
   left: 0;
-  width: max(260px, calc((100vw - 1180px) / 0.766 + 20px));
+  /* +32px rather than +20: the rotation below swings the plate's top-left
+     corner very slightly inward, and the margin has to cover that too. */
+  width: max(260px, calc((100vw - 1180px) / 0.766 + 32px));
   aspect-ratio: 405 / 390;
+  /* Pivot on the galleon itself, not the middle of the plate. Rotating about
+     the centre moved the ship 7.2px sideways — 1.8% of the plate's width — and
+     that was the misaligned corner: the translate put the galleon exactly on
+     the column edge and then the rotate slid it off again. Turning the plate
+     about the ship leaves the ship where it was put.
+     38.3% across, 14.9% down: measured off the plate, not estimated. */
+  transform-origin: 38.3% 14.9%;
   transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 20%) rotate(3deg);
 }
 
