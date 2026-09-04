@@ -183,7 +183,7 @@
    same width, same bleed off the corner, so the two right-hand creatures read
    as a matched pair top and bottom. Sized to the window, not to the gutter, so
    it does not depend on there being a margin at all. */
-.marg-corner {
+.marg.marg-corner {
   top: auto;
   bottom: 0;
   width: clamp(130px, 29vw, 460px);
@@ -192,7 +192,7 @@
    a few percent up from the bottom left a band of bare parchment underneath,
    which reads as a plate that missed its mark rather than as one running off
    the edge — the corner has to be filled or not used. */
-.marg-dragon {
+.marg.marg-dragon {
   right: 0;
   aspect-ratio: 800 / 769;
   transform: translate(24%, 12%) rotate(5deg) scaleX(-1);
@@ -218,16 +218,25 @@
    and what fills the margin is the middle of the creature rather than its edge.
 
    `min(0px, ...)` only guards the narrow end, where the gutter goes to zero. */
-.marg-kraken {
+.marg.marg-kraken {
   left: 0;
   /* Sized from the SAME measured edge it aligns to. Deriving it from the
      viewport instead — calc((100vw - 1180px) / 2) — is what kept the ship
      short of the box: that is the column's border box, and the panels start
      one padding further in. --panel-left is measured off a real panel in
      app.js, so it cannot drift out of step with the padding rules.
-     +32px rather than +20: the rotation below swings the plate's top-left
-     corner very slightly inward and the margin has to cover that too. */
-  width: max(260px, calc(var(--panel-left, 0px) / 0.383 + 32px));
+     Divided by 0.371 rather than by the galleon's own 0.383: the rotation
+     below swings the plate's top-left corner inward by about 0.8% of its
+     width, and since the width grows with the window a FIXED margin gets eaten
+     — at 2240px the left edge had crept back to 0.4px off the window. Folding
+     the allowance into the divisor makes it scale with the plate instead.
+
+     Written as `.marg.marg-kraken` because `.marg` alone matches this element
+     too, sets its own width in a later @media block, and at equal specificity
+     was winning: the plate was rendering at 352px where this rule asks for
+     643px, which is exactly why the galleon never reached the column edge no
+     matter what the offset said. */
+  width: max(260px, calc(var(--panel-left, 0px) / 0.371 + 24px));
   aspect-ratio: 405 / 390;
   /* Pivot on the galleon itself, not the middle of the plate. Rotating about
      the centre moved the ship 7.2px sideways — 1.8% of the plate's width — and
@@ -240,8 +249,8 @@
 }
 
 @media (min-width: 1400px) {
-  .marg-dragon { transform: translate(12%, 7%) rotate(5deg) scaleX(-1); }
-  .marg-kraken { transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 15%) rotate(3deg); }
+  .marg.marg-dragon { transform: translate(12%, 7%) rotate(5deg) scaleX(-1); }
+  .marg.marg-kraken { transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 15%) rotate(3deg); }
 }
 
 .marg-serpent {
@@ -1370,7 +1379,7 @@ a:hover { color: var(--coffee-deep); }
    the padding SHORTHAND, it appears later in this file (in the Responsive
    block), and at equal specificity that reset padding-bottom to 0. Every
    attempt to give the orm room silently did nothing because of it. */
-.colophon.wrap { padding-bottom: clamp(64px, 36vw, 420px); }
+.colophon.wrap { padding-bottom: clamp(64px, 20vw, 240px); }
 /* The one heading that sits on the bare ground rather than on a panel. */
 #sheet-heading { color: var(--ink-on-ground); }
 
@@ -1389,11 +1398,11 @@ a:hover { color: var(--coffee-deep); }
 .colophon { position: relative; }
 .marg-orm {
   position: absolute;
-  /* Inset by more than the rotation can add. A rotated box reports a bounding
-     box wider than the element — at 1 degree over a ~300px height that is ~5px
-     each side — and at full width that was enough to push the page into
-     horizontal scroll. */
-  left: 8px;
+  /* Just over half the column, centred. At full width it came out 1174px
+     across and 581 tall on a 1600px window — not a marginal any more but a
+     mural — and its rotated bounding box also spilled far enough to put the
+     page into horizontal scroll. Both go away at this size. */
+  left: 50%;
   /* Anchored to the FOOT of the colophon, not centred on it. Centring put the
      creature behind the four columns of type, and positioning it by percentage
      overhung the end of the page: the plate's height follows the column width
@@ -1409,11 +1418,11 @@ a:hover { color: var(--coffee-deep); }
      past the end of the page. */
   top: auto;
   bottom: 0;
-  width: calc(100% - 16px);
+  width: min(560px, 56%);
   aspect-ratio: 887 / 427;
   z-index: -1;
   opacity: 0.32;
-  transform: rotate(-1deg);
+  transform: translateX(-50%) rotate(-1deg);
 }
 /* Below this the colophon collapses to a single narrow column and a 2.08:1
    plate behind it is too small to read as a picture. */
