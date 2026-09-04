@@ -487,24 +487,31 @@ function sailFleet(svg) {
       const band = free[Math.floor(Math.random() * free.length)];
       taken.add(band);
 
-      // Ships work up and down the coast, which is the only axis with room.
-      // Both ends stay strictly inside the padded band, so a hull is never
-      // solid anywhere near a neighbouring band's water.
+      // Every ship works north, up the coast. Alternating the direction at
+      // random was what made the movement read wrong: with two hulls on screen
+      // one would slide up while the other slid down, which no fleet does, and
+      // a ship reversing its course on its next voyage looked like a glitch
+      // rather than a passage. Both ends stay strictly inside the padded band,
+      // so a hull is never solid anywhere near a neighbouring band's water.
       const top = SEA_LANE.y0 + band * bandH + BAND_PAD;
       const bot = SEA_LANE.y0 + (band + 1) * bandH - BAND_PAD;
-      const northbound = Math.random() < 0.5;
+      // One track, not two independent draws. Picking the start and finish x
+      // separately let a ship crab sideways across the lane as it went; a
+      // couple of units of lateral wander is a course held in a seaway.
+      const trackX = lane();
+      const driftX = trackX + rand(-4, 4);
       // Element.animate() *adds* an animation; the previous one keeps filling
       // forever otherwise, so they accumulate one per voyage for as long as the
       // page is open. Retire it explicitly.
       if (current) current.cancel();
       const anim = g.animate(
         [
-          { transform: `translate(${lane().toFixed(1)}px,${(northbound ? bot : top).toFixed(1)}px)`,
-            opacity: 0 },
-          { opacity: 1, offset: 0.18 },
-          { opacity: 1, offset: 0.82 },
-          { transform: `translate(${lane().toFixed(1)}px,${(northbound ? top : bot).toFixed(1)}px)`,
-            opacity: 0 },
+          { transform: `translate(${trackX.toFixed(1)}px,${bot.toFixed(1)}px)`, opacity: 0 },
+          { opacity: 1, offset: 0.14 },
+          { opacity: 1, offset: 0.76 },
+          // A long fade at the head of the run: the ship should thin out into
+          // the distance over the last quarter of its passage, not switch off.
+          { transform: `translate(${driftX.toFixed(1)}px,${top.toFixed(1)}px)`, opacity: 0 },
         ],
         // Slow. This is a ship seen from a long way off, not a boat crossing a
         // pond: ~140 units in two to three and a half minutes works out under
