@@ -672,17 +672,13 @@ a:hover { color: var(--coffee-deep); }
 }
 .ship-line { fill: none; stroke: var(--olive); stroke-width: 0.35; opacity: 0.7; }
 .ship-flag { fill: var(--coffee); }
-/* The water parting at the hull. Nested arcs fading outward, so the swell
-   visibly goes around the ship rather than simply stopping at the mask. */
 /* The settled water a hull sits in. Same colour as the sea, so it reads as
    water rather than as a patch: opaque at the centre, gone by the edge. */
 .clearing-in  { stop-color: var(--paper-raised); stop-opacity: 1; }
 .clearing-out { stop-color: var(--paper-raised); stop-opacity: 0; }
 
-.ship-wake { fill: none; stroke: var(--coffee); stroke-linecap: round; }
-.wake-0 { stroke-width: 1.4; opacity: 0.55; }
-.wake-1 { stroke-width: 1.0; opacity: 0.36; }
-.wake-2 { stroke-width: 0.7; opacity: 0.22; }
+.ship-wake { fill: none; stroke: var(--antique); stroke-width: 0.6; opacity: 0.5;
+             stroke-linecap: round; }   /* only the unused CHROME.galleon() */
 
 /* --- sea creatures ------------------------------------------------------ */
 .creature-body {
@@ -717,24 +713,42 @@ a:hover { color: var(--coffee-deep); }
   }
   .depth { animation: water-shimmer 18s linear infinite; }
 
-  /* The fleet. Two motions kept in separate groups so neither has to know
-     about the other: the outer one is the ship making way across the chart,
-     the inner one is the hull answering the swell under it. Both are pure
-     transforms, so they composite without touching layout, and the periods are
-     deliberately unrelated (a ~40s traverse against a ~8s roll) so the two
-     never lock into a mechanical-looking beat. */
-  .ship-bob {
-    animation: ship-bob var(--dur, 8s) ease-in-out infinite;
+  /* The hull answering the sea under it, kept in two separate groups so
+     neither motion has to know about the other: a roll and a heave, on periods
+     that do not divide evenly into one another. Because they never come back
+     into the same relationship, the ship never repeats a pose. One sine on one
+     period is a metronome however small its amplitude, which is what made the
+     earlier single "bob" read as mechanical. Both are pure transforms, so they
+     composite without touching layout. */
+  .ship-roll {
+    animation: ship-roll var(--dur, 9s) ease-in-out infinite;
     transform-box: fill-box;
     transform-origin: 50% 78%;   /* the waterline, not the masthead */
+    will-change: transform;
+  }
+  .ship-heave {
+    animation: ship-heave var(--dur, 6s) ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: 50% 78%;
     will-change: transform;
   }
 }
 @keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
 @keyframes water-shimmer { to { stroke-dashoffset: -40; } }
-@keyframes ship-bob {
-  0%,100% { transform: rotate(-1.7deg) translateY(0.6px); }
-  50%     { transform: rotate(1.7deg)  translateY(-0.6px); }
+/* Shallow, and unevenly spaced. A hull seen from this far off barely leans —
+   the previous 1.7deg swung the mastheads far enough to read as a toy — and
+   the uneven keyframe offsets keep even this one motion off a clean sine. */
+@keyframes ship-roll {
+  0%   { transform: rotate(-1deg); }
+  38%  { transform: rotate(0.85deg); }
+  63%  { transform: rotate(0.2deg); }
+  100% { transform: rotate(-1deg); }
+}
+@keyframes ship-heave {
+  0%   { transform: translateY(0.7px); }
+  45%  { transform: translateY(-0.8px); }
+  72%  { transform: translateY(-0.1px); }
+  100% { transform: translateY(0.7px); }
 }
 
 /* --- the star on the best spot ------------------------------------------ */

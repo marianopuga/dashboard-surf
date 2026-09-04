@@ -352,9 +352,14 @@ function crestField(from) {
 const FLEET = [
   // 74 was too wide: the sea lane is only ~90 units across, so the largest
   // hull filled it and left nothing for the water either side of it.
-  { w: 66, rot: -4, flip: false, bob: 11 },
-  { w: 52, rot: 6,  flip: true,  bob: 9 },
-  { w: 43, rot: -8, flip: false, bob: 7.5 },
+  // `roll` and `heave` are deliberately not multiples of each other. Two
+  // motions on periods that do not divide evenly never come back into the same
+  // relationship, so the combined movement does not repeat — which is what
+  // stops it reading as a mechanism. A single sine at one frequency is a
+  // metronome no matter how small you make it.
+  { w: 66, rot: -4, flip: false, roll: 11,  heave: 7.3 },
+  { w: 52, rot: 6,  flip: true,  roll: 8.5, heave: 5.9 },
+  { w: 43, rot: -8, flip: false, roll: 7,   heave: 4.7 },
 ];
 
 // The water a ship may sail in: east of the shoreline's furthest point
@@ -365,37 +370,6 @@ const SEA_LANE = { x0: 214, x1: 302, y0: 20, y1: 505 };
 /** The fleet's DOM, kept across re-renders so voyages are never restarted. */
 let FLEET_NODE = null;
 const SHIP_ASPECT = 248 / 199;   // assets/ship-cutout.png, height / width
-
-/**
- * The water parting at a hull. Masking the crests away around a ship stops the
- * swell running *through* it, but on its own it just leaves a hole — the sea
- * has to be seen to go around, not merely to stop. Three nested arcs at the
- * waterline do that, and they are the same mark an engraver would have used.
- *
- * The waterline is at 78% of the plate's height, the same figure the bob
- * animation rotates about, so the wake stays pinned to the hull rather than to
- * the image box.
- */
-function shipWake(s) {
-  const h = s.w * SHIP_ASPECT;
-  const yw = -h / 2 + h * 0.78;   // relative to the plate's centre: the ship
-  let out = "";                    // is drawn at the origin and moved by JS
-  // The hull is roughly half a plate-width across at the waterline, so the
-  // innermost arc has to start wider than that or it hides under the ship
-  // instead of reading as water pushed aside. These reach well past it, out
-  // into the ring the mask clears.
-  for (let j = 0; j < 3; j++) {
-    const rx = s.w * (0.60 + j * 0.20);
-    // Deep enough to be a curve. At the first attempt the arcs dipped only
-    // 0.16 of a plate-width over a span of 1.3, which is flat enough that they
-    // rendered as three horizontal rules ruled under the hull.
-    const dip = s.w * (0.15 + j * 0.06);
-    out += `<path class="ship-wake wake-${j}"
-      d="M${(-rx).toFixed(1)} ${yw.toFixed(1)}
-         Q0 ${(yw + dip * 2).toFixed(1)} ${rx.toFixed(1)} ${yw.toFixed(1)}"/>`;
-  }
-  return out;
-}
 
 // ===========================================================================
 // The chart
@@ -713,14 +687,16 @@ function renderChart(rows, cond, activeId) {
            colour laid OVER the crests, not a hole cut in them, which is the
            whole reason it can move: a mask would have to be re-cut every frame
            to follow a ship, whereas a sibling inside the moving group follows
-           for free. Its soft edge makes the swell fade into the wake rather
-           than stop against a rim. -->
+           for free. Its soft edge makes the swell fade out around the hull
+           rather than stop against a rim. -->
       <ellipse class="ship-clearing" cx="0" cy="0"
-               rx="${s.w * 0.78}" ry="${s.w * 0.92}" fill="url(#ship-clearing)"/>
-      ${shipWake(s)}
-      <g class="ship-bob" style="--dur:${s.bob}s">
-        <g transform="rotate(${s.rot})${s.flip ? " scale(-1 1)" : ""}">
-          ${CHROME.plate("assets/ship-cutout.png", 0, 0, s.w, "ship", SHIP_ASPECT)}
+               rx="${(s.w * 0.62).toFixed(1)}" ry="${(s.w * 0.72).toFixed(1)}"
+               fill="url(#ship-clearing)"/>
+      <g class="ship-heave" style="--dur:${s.heave}s">
+        <g class="ship-roll" style="--dur:${s.roll}s">
+          <g transform="rotate(${s.rot})${s.flip ? " scale(-1 1)" : ""}">
+            ${CHROME.plate("assets/ship-cutout.png", 0, 0, s.w, "ship", SHIP_ASPECT)}
+          </g>
         </g>
       </g>
     </g>`).join("");
