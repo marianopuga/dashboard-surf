@@ -369,37 +369,38 @@ const FLEET = [
   { w: 36, rot: -4, roll: 7,   heave: 4.7 },
 ];
 
-// The shipping lane, traced from the course drawn on the chart: up the outside
-// of the swell, well off the beaches, bowing west through the middle.
+// The shipping lane. Ships enter from below the bottom of the plate and leave
+// through the right-hand edge up near Long Reef — they are passing through, on
+// their way somewhere off this chart, and both ends of the run are OUTSIDE the
+// frame. That is deliberate and it is what removed the fading: a ship that
+// dissolves in open water looks like a rendering fault, whereas one that sails
+// off the edge has simply gone.
 //
-// Three adjustments to what was drawn. It is shifted ~18 units west, because
-// the line as drawn sat on the plate's own right edge and a hull centred there
-// would have been sliced in half by the viewBox. The hook at the very top is
-// gone entirely — see NO_GO_Y. And what remains ends far enough south that a
-// hull has faded out completely before it could reach the closed water.
+// Because both ends sit off-frame, the loop point is invisible too — the jump
+// from the last waypoint back to the first happens where nothing is drawn, so
+// no cross-fade is needed to hide it.
 //
-// Ordered bottom (where a ship appears) to top (where it goes).
+// Ordered bottom (entry) to top-right (exit).
 const ROUTE = [
-  { x: 289, y: 499 },   // in the open, just north of the cartouche
-  { x: 287, y: 462 },
-  { x: 285, y: 411 },
-  { x: 282, y: 368 },
-  { x: 279, y: 324 },
-  { x: 274, y: 276 },
-  { x: 269, y: 228 },
-  { x: 265, y: 185 },
-  { x: 263, y: 150 },
-  { x: 262, y: 130 },   // gone, and well south of the closed water
+  { x: 300, y: 720 },   // below the plate, out of sight
+  { x: 296, y: 640 },
+  { x: 292, y: 570 },
+  { x: 289, y: 505 },
+  { x: 286, y: 440 },
+  { x: 282, y: 378 },
+  { x: 277, y: 318 },
+  { x: 272, y: 262 },
+  { x: 269, y: 214 },   // the westernmost point of the bow
+  { x: 272, y: 178 },
+  { x: 285, y: 155 },
+  { x: 310, y: 143 },
+  { x: 365, y: 135 },   // clear of the right-hand edge, gone
 ];
 
-// Closed water: nothing may put a pixel north of this line. Marked out on the
-// chart by hand — it is the corner off the Long Reef headland, where the sea
-// narrows between the point and the edge of the plate.
-//
-// The rule is about the HULL, not the track: a ship is ~65 units tall and only
-// its midpoint rides the route, so the route has to stop a half-height plus a
-// margin short of the line. It is enforced in shipTrack rather than left to
-// the route numbers, so the boundary survives anyone editing the course.
+// Closed water: no visible pixel of a hull may sit north of this line. Marked
+// out on the chart by hand — the corner off the Long Reef headland. The exit
+// runs beneath it: a hull is ~65 units tall and only its midpoint rides the
+// route, so the course has to clear the line by a half-height.
 const NO_GO_Y = 90;
 const LANE_Y1 = ROUTE[0].y;
 const LANE_Y0 = ROUTE[ROUTE.length - 1].y;
@@ -437,9 +438,9 @@ function shipTrack(off, beam, halfH) {
   const N = 48;
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
   const reach = halfH + span;
-  const eastLimit = COAST.W - 6 - beam;
-  // The furthest north a hull's CENTRE may sit and still keep every pixel of
-  // itself south of the closed water.
+  // No eastern clamp. The route deliberately runs off the right-hand edge, and
+  // clamping it back on-plate would have parked the ships against the border
+  // instead of letting them leave.
   const northLimit = NO_GO_Y + halfH + 6;
 
   for (let i = 0; i <= N; i++) {
@@ -455,9 +456,8 @@ function shipTrack(off, beam, halfH) {
     for (let d = -reach; d <= reach; d += reach / 8) {
       shore = Math.max(shore, SHORE_X(clamp(y + d, 0, COAST.H)));
     }
-    const westLimit = shore + beam + MIN_CLEAR;
     pts.push({
-      x: clamp(routeX, Math.min(westLimit, eastLimit), eastLimit),
+      x: Math.max(routeX, shore + beam + MIN_CLEAR),
       y: Math.max(y, northLimit),
     });
   }
@@ -531,21 +531,21 @@ function sailFleet(svg) {
     const track = shipTrack(rand(-9, 9), beam, FLEET[i].w * SHIP_ASPECT * 0.5);
 
     if (reduced) {
-      // Becalmed, but still strung out along the coast rather than stacked.
-      const p = track[Math.round((0.25 + i * 0.25) * (track.length - 1))];
+      // Becalmed, but still strung out along the lane rather than stacked, and
+      // at points that are on the plate rather than off either end of it.
+      const p = track[Math.round((0.3 + i * 0.2) * (track.length - 1))];
       g.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
       g.style.opacity = 1;
       return;
     }
 
-    const frames = track.map((p, k) => {
-      const t = k / (track.length - 1);
-      // Up quickly at the bottom, down over the last stretch, so a ship fades
-      // in low on the chart and thins into the distance at the top rather than
-      // switching off at an edge.
-      const opacity = t < 0.06 ? t / 0.06 : t > 0.86 ? (1 - t) / 0.14 : 1;
-      return { offset: t, transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`, opacity };
-    });
+    // Fully opaque the whole way. The plate's own edges do the appearing and
+    // disappearing: a ship is simply outside the frame at both ends of its run.
+    const frames = track.map((p, k) => ({
+      offset: k / (track.length - 1),
+      transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`,
+      opacity: 1,
+    }));
 
     g.animate(frames, {
       duration: dur,
@@ -560,20 +560,33 @@ function sailFleet(svg) {
 }
 
 /**
- * The mark on the best spot: an X, the way a treasure map marks the place.
+ * The mark on the best spot: an X scrawled on a map.
  *
- * Two strokes, not a glyph. Each one bows slightly and neither is quite the
- * length or angle of the other, because a cross drawn with two straight equal
- * lines reads as a multiplication sign — the whole character of the mark is
- * that a hand made it in a hurry.
+ * Straight runs with a kink or two, not curves. Built from smooth cubics first
+ * and it came out melted — a stroke that bends continuously along its whole
+ * length reads as something poured rather than something drawn. A hand moves
+ * in straight pulls and changes direction at a point, so these are polylines:
+ * each stroke holds its line, breaks once or twice off true, and carries on.
+ *
+ * Every number is still deliberately wrong. The strokes are different lengths,
+ * they cross above and left of centre, they bend opposite ways, and both run a
+ * little past the corner they were aiming at — two clean mirrored lines
+ * crossing at their midpoints read as a multiplication sign however thickly
+ * you draw them.
+ *
+ * Coordinates are in a -1..1 box, scaled by `r`. Fixed rather than random, so
+ * the mark does not twitch on every repaint — and the chart repaints on every
+ * slider tick and every hover.
  */
 function xMark(r) {
-  const n = (v) => v.toFixed(1);
+  const p = (pts) => "M" + pts.map(([x, y]) =>
+    `${(x * r).toFixed(1)} ${(y * r).toFixed(1)}`).join("L");
   return [
-    // down-right: bows a little below the true diagonal
-    `M${n(-r)} ${n(-r * 0.94)} Q${n(-r * 0.06)} ${n(r * 0.1)} ${n(r * 0.98)} ${n(r)}`,
-    // down-left: crosses slightly above centre and overshoots the first
-    `M${n(r * 0.92)} ${n(-r)} Q${n(r * 0.04)} ${n(-r * 0.08)} ${n(-r)} ${n(r * 0.9)}`,
+    // Down-right. Pulls straight, kinks above the true diagonal a third of the
+    // way along, then runs hard to the corner and past it.
+    p([[-1.04, -0.82], [-0.44, -0.30], [-0.02, 0.20], [0.54, 0.56], [1.06, 1.00]]),
+    // Down-left. Shorter, bows the other way, and breaks once near the middle.
+    p([[0.94, -1.02], [0.42, -0.44], [-0.04, -0.10], [-0.54, 0.40], [-0.98, 0.94]]),
   ];
 }
 
@@ -708,8 +721,11 @@ function renderChart(rows, cond, activeId) {
               // stroke's broad parchment pass paints straight over the first
               // stroke's ink and rubs out half the X.
               const d = xMark(18);
-              return d.map((p) => `<path class="x-clear" d="${p}"/>`).join("")
-                   + d.map((p) => `<path class="x-ink" d="${p}"/>`).join("");
+              // Tilted, because nothing drawn by hand lands square to the page.
+              return `<g transform="rotate(-8)">`
+                   + d.map((p) => `<path class="x-clear" d="${p}"/>`).join("")
+                   + d.map((p) => `<path class="x-ink" d="${p}"/>`).join("")
+                   + `</g>`;
             })()
           : `<circle class="dot" r="4.5"/>`}
       </g>`;
@@ -763,11 +779,23 @@ function renderChart(rows, cond, activeId) {
   svg.innerHTML = `
     <defs>
       <clipPath id="sea-clip"><path d="${SEA_PATH}"/></clipPath>
-      <!-- Stipple for the land. It was the one large flat fill left on the
-           chart, and a flat slab beside a textured page reads as a hole rather
-           than as ground. Two dots on an off-square, rotated grid: the offset
-           and the rotation stop the eye finding rows in it. -->
-      <pattern id="land-tex" width="7" height="7" patternUnits="userSpaceOnUse"
+      <!-- The land's surface: the old-map photograph, knocked 72% toward the
+           land tone when it was baked so its own coastlines are not legible
+           and only the mottling and fibre survive.
+
+           Laid down ONCE, stretched across the whole plate, rather than tiled.
+           The land is a tall narrow strip, so any tile small enough to sit in
+           it repeats several times down its length and reads as wallpaper —
+           the same thing that went wrong when this photograph was first tried
+           as the page background. One image has no repeat to find. -->
+      <pattern id="land-tex" patternUnits="userSpaceOnUse"
+               x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}">
+        <image href="assets/land-parchment.jpg" x="${VIEW.x}" y="0"
+               width="${VIEW.w}" height="${COAST.H}" preserveAspectRatio="xMidYMid slice"/>
+      </pattern>
+      <!-- Stipple over the top, to give the surface a tooth the photograph's
+           own upscale cannot. -->
+      <pattern id="land-grain" width="7" height="7" patternUnits="userSpaceOnUse"
                patternTransform="rotate(17)">
         <circle class="land-stipple" cx="1.5" cy="1.5" r="0.55"/>
         <circle class="land-stipple" cx="4.9" cy="4.3" r="0.4"/>
@@ -790,6 +818,7 @@ function renderChart(rows, cond, activeId) {
     <g class="chart-chrome fleet-layer" clip-path="url(#sea-clip)"></g>
     <path class="land" d="${LAND_PATH}"/>
     <path class="land-tex" d="${LAND_PATH}"/>
+    <path class="land-grain" d="${LAND_PATH}"/>
     <path class="shore" d="${COAST.coast}"/>
     ${COAST.rocks.map((d) => `<path class="rock" d="${d}"/>`).join("")}
     ${geometry.join("")}
@@ -797,7 +826,7 @@ function renderChart(rows, cond, activeId) {
     ${labels.join("")}
     ${arrows.join("")}
     ${tideGauge(cond, VIEW.x + 16, 108)}
-    ${cartouche(active, activeScore, cond, VIEW.x + VIEW.w - CART_W - 10, COAST.H - 130, CART_W)}
+    ${cartouche(active, activeScore, cond, VIEW.x + 12, COAST.H - 130, CART_W)}
   `;
 
   // The fleet is built ONCE and then moved into each fresh render, rather than

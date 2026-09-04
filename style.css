@@ -258,15 +258,24 @@ body::after {
     width: min(400px, calc(100vw - 1180px));
   }
   /* Flush with the window edge, so the cut is never at the screen. */
+  /* Raised, so its tail lands in the gap between the conditions panel and the
+     chart rather than disappearing behind one of them. */
   .marg-unicorn {
     left: 0;
-    top: 33%;
+    top: 24%;
     aspect-ratio: 575 / 431;
     transform: rotate(-4deg);
   }
+  /* The one plate held WHOLLY inside the margin. It is nearly square, so at
+     twice the gutter it was tall enough that the half tucked under the column
+     took the creature itself and left only the tail showing — the tuck works
+     for a wide plate like the unicorn, not for this one. Sized to the gutter
+     instead: as large as it can be and still be entirely visible. */
   .marg-dragon {
-    right: 0;
-    top: 27%;
+    right: 6px;
+    top: 26%;
+    width: calc((100vw - 1180px) / 2 - 12px);
+    max-width: 340px;
     aspect-ratio: 800 / 769;
     transform: rotate(5deg) scaleX(-1);
   }
@@ -611,8 +620,12 @@ a:hover { color: var(--coffee-deep); }
 
 .sea  { fill: var(--paper-raised); }
 .land { fill: var(--paper-sunken); }
-.land-tex { fill: url(#land-tex); pointer-events: none; }
-.land-stipple { fill: var(--coffee); opacity: 0.16; }
+/* The photographed parchment, over the flat land fill. Kept below full
+   strength so the land still reads as the palette's own tone rather than as a
+   photograph dropped into the chart. */
+.land-tex { fill: url(#land-tex); pointer-events: none; opacity: 0.72; }
+.land-grain { fill: url(#land-grain); pointer-events: none; }
+.land-stipple { fill: var(--coffee); opacity: 0.13; }
 .shore { fill: none; stroke: var(--olive); stroke-width: 1.25; stroke-linejoin: round; }
 .rock  { fill: var(--paper-sunken); stroke: var(--olive); stroke-width: 0.75; }
 
@@ -761,11 +774,11 @@ a:hover { color: var(--coffee-deep); }
 }
 .ship-line { fill: none; stroke: var(--olive); stroke-width: 0.35; opacity: 0.7; }
 .ship-flag { fill: var(--coffee); }
-/* Hidden until a voyage takes charge of it. A ship between voyages — or one
-   waiting for a band to come free — has no animation driving its transform, so
-   without this it renders at the untransformed origin, which is a corner of the
-   chart, not open sea. The animation sets opacity from its own keyframes and
-   fills forwards, so it owns this the moment it starts. */
+/* Hidden until its animation takes charge of it. Without this a ship renders
+   for one frame at the untransformed origin — a corner of the chart, not open
+   sea. The animation holds opacity at 1 for its whole run, so it owns this the
+   moment it starts; nothing fades any more, the frame's own edges do the
+   appearing and disappearing. */
 .ship-voyage { opacity: 0; }
 
 /* The settled water a hull sits in. Same colour as the sea, so it reads as
@@ -862,6 +875,7 @@ a:hover { color: var(--coffee-deep); }
   stroke-width: 8;
   stroke-linecap: round;
   opacity: 0.75;
+  stroke-linejoin: round;
 }
 /* One colour, always. The X used to take the tier's ink like the dot it
    replaced did — darker when pumping, lighter when flat — so it changed shade
@@ -877,6 +891,7 @@ a:hover { color: var(--coffee-deep); }
   stroke: var(--treasure);
   stroke-width: 6;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 @media (prefers-reduced-motion: no-preference) {
