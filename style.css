@@ -249,6 +249,14 @@ body::after {
   display: none;
   top: auto;
   aspect-ratio: auto;
+  /* A gentler edge than the top pair. `.marg` dissolves from 42% out, which
+     suits a creature bleeding off the page but eats most of a plate that is
+     meant to sit whole in a margin — it was why the dragon looked small inside
+     its space even at full gutter width. This only softens the outer rim. */
+  -webkit-mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
+    #000 0 76%, rgba(0,0,0,0.65) 90%, transparent 100%);
+  mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
+    #000 0 76%, rgba(0,0,0,0.65) 90%, transparent 100%);
 }
 
 @media (min-width: 1340px) {
@@ -271,13 +279,17 @@ body::after {
      took the creature itself and left only the tail showing — the tuck works
      for a wide plate like the unicorn, not for this one. Sized to the gutter
      instead: as large as it can be and still be entirely visible. */
+  /* Centred in the right margin and as wide as that margin allows: this plate
+     is nearly square, so width is what limits it, and the gutter is far taller
+     than it is wide. Held wholly inside the margin rather than tucked under the
+     column like the other two — at twice the gutter the hidden half took the
+     creature and left only its tail. */
   .marg-dragon {
-    right: 6px;
-    top: 26%;
-    width: calc((100vw - 1180px) / 2 - 12px);
-    max-width: 340px;
+    right: 8px;
+    top: 50%;
+    width: min(460px, calc((100vw - 1180px) / 2 - 16px));
     aspect-ratio: 800 / 769;
-    transform: rotate(5deg) scaleX(-1);
+    transform: translateY(-50%) rotate(5deg) scaleX(-1);
   }
   .marg-kraken {
     left: 0;
