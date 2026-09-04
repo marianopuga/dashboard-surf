@@ -352,9 +352,9 @@ function crestField(from) {
 const FLEET = [
   // 74 was too wide: the sea lane is only ~90 units across, so the largest
   // hull filled it and left nothing for the water either side of it.
-  { w: 60, rot: -4, flip: false, bob: 8.2 },
-  { w: 46, rot: 6,  flip: true,  bob: 6.4 },
-  { w: 37, rot: -8, flip: false, bob: 5.5 },
+  { w: 60, rot: -4, flip: false, bob: 11 },
+  { w: 46, rot: 6,  flip: true,  bob: 9 },
+  { w: 37, rot: -8, flip: false, bob: 7.5 },
 ];
 
 // The water a ship may sail in: east of the shoreline's furthest point
@@ -463,6 +463,8 @@ function sailFleet(svg) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     // Still put them on the water — just becalmed, at a fixed spread.
     svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
+      // Spread over the same lane the voyages use, evenly, so becalmed ships
+      // are as far apart as sailing ones ever get.
       const y = SEA_LANE.y0 + ((i + 1) / (FLEET.length + 1)) * (SEA_LANE.y1 - SEA_LANE.y0);
       g.setAttribute("transform", `translate(${(SEA_LANE.x0 + SEA_LANE.x1) / 2},${y.toFixed(1)})`);
     });
@@ -473,14 +475,29 @@ function sailFleet(svg) {
 
   // The lane is only ~90 units wide and the largest hull is most of that, so
   // two ships cannot pass each other side by side — left to pick freely they
-  // drift into the same water and overlap, which looks like a rendering fault
-  // rather than like shipping. The lane is therefore cut into bands and a ship
-  // claims one for the length of its voyage. Which band it gets is still
-  // chosen at random from whatever is free, and a ship waiting over the
-  // horizon holds nothing, so the sea stays unpredictable without ever
-  // stacking two hulls.
-  const bandCount = FLEET.length;
-  const bandH = (SEA_LANE.y1 - SEA_LANE.y0) / bandCount;
+  // drift into the same water and collide, which looks like a rendering fault
+  // rather than like shipping. So the lane is cut into bands and a ship claims
+  // one for the whole voyage; which band it gets is still random among those
+  // free, and a ship waiting over the horizon holds nothing.
+  //
+  // Two numbers here are what actually keep hulls apart, and the first attempt
+  // got both wrong:
+  //
+  //   BAND_PAD  Ships travel only the middle of their band. Without it a ship
+  //             reaches full opacity ~18% into its run, which was still inside
+  //             the neighbouring band, so two hulls were solid and touching at
+  //             the boundary. The pad guarantees 2*BAND_PAD of clear water
+  //             between any two visible ships; the tallest hull is 60*1.246 =
+  //             75 units, so two half-heights is 75 and 100 clears it.
+  //
+  //   BANDS     Fewer bands than ships. Three bands over this lane left each
+  //             one too short to sail once padded, and every ship was always
+  //             on screen. With two, each voyage gets real distance and one of
+  //             the three hulls is always over the horizon — so which ships
+  //             are out, and where, keeps changing.
+  const BANDS = 2;
+  const BAND_PAD = 50;
+  const bandH = (SEA_LANE.y1 - SEA_LANE.y0) / BANDS;
   const taken = new Set();
 
   svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
@@ -489,16 +506,16 @@ function sailFleet(svg) {
 
     const voyage = () => {
       const free = [];
-      for (let b = 0; b < bandCount; b++) if (!taken.has(b)) free.push(b);
-      if (!free.length) return void setTimeout(voyage, rand(3000, 9000));
+      for (let b = 0; b < BANDS; b++) if (!taken.has(b)) free.push(b);
+      if (!free.length) return void setTimeout(voyage, rand(4000, 14000));
       const band = free[Math.floor(Math.random() * free.length)];
       taken.add(band);
 
       // Ships work up and down the coast, which is the only axis with room.
-      // The ends sit a little outside the band so the fade happens off its
-      // edges and neighbouring bands never show two hulls at once.
-      const top = SEA_LANE.y0 + band * bandH - 30;
-      const bot = SEA_LANE.y0 + (band + 1) * bandH + 30;
+      // Both ends stay strictly inside the padded band, so a hull is never
+      // solid anywhere near a neighbouring band's water.
+      const top = SEA_LANE.y0 + band * bandH + BAND_PAD;
+      const bot = SEA_LANE.y0 + (band + 1) * bandH - BAND_PAD;
       const northbound = Math.random() < 0.5;
       const anim = g.animate(
         [
@@ -509,13 +526,17 @@ function sailFleet(svg) {
           { transform: `translate(${lane().toFixed(1)}px,${(northbound ? top : bot).toFixed(1)}px)`,
             opacity: 0 },
         ],
-        { duration: rand(48000, 92000), easing: "linear", fill: "forwards" }
+        // Slow. This is a ship seen from a long way off, not a boat crossing a
+        // pond: ~140 units in two to three and a half minutes works out under
+        // a pixel a second on screen, which is movement you notice only if you
+        // stay with it.
+        { duration: rand(115000, 205000), easing: "linear", fill: "forwards" }
       );
       // A pause over the horizon before the next one, so the sea is sometimes
       // emptier than it is now and the reappearance is not on a beat.
       anim.onfinish = () => {
         taken.delete(band);
-        setTimeout(voyage, rand(5000, 26000));
+        setTimeout(voyage, rand(10000, 45000));
       };
     };
 
@@ -609,8 +630,13 @@ function renderChart(rows, cond, activeId) {
   // not from the selection, so the mark keeps answering "where do I go" even
   // while you are looking at somewhere else. Nothing is starred when nothing
   // is worth the trip.
+  // Always marked, even when the whole coast is flat. Hiding the star on flat
+  // hours meant it blinked out and back as the slider crossed them, which
+  // reads as a bug; and "the least bad of a bad lot" is still the answer to
+  // where you'd go. The flat case is told apart by the star's treatment (see
+  // .pin.is-best.q-flat), not by its absence.
   const bestRow = rows.length ? rows.slice().sort(SCORE.compareScored)[0] : null;
-  const bestId = bestRow && bestRow.score.tier !== "flat" ? bestRow.spot.id : null;
+  const bestId = bestRow ? bestRow.spot.id : null;
 
   // Split into two layers: the active spot's geometry sits under every pin, so
   // a wedge can never cover a neighbouring dot.
@@ -652,10 +678,10 @@ function renderChart(rows, cond, activeId) {
     return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""} ${isBest ? "is-best" : ""}"
               data-spot="${spot.id}"
               transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})">
-        <circle class="halo" r="${isBest ? 12 : 9}"/>
+        <circle class="halo" r="${isBest ? 15 : 9}"/>
         ${isBest
-          ? `<path class="star-glow" d="${starPath(0, 0, 13)}"/>
-             <path class="dot dot-star" d="${starPath(0, 0, 8.5)}"/>`
+          ? `<path class="star-glow" d="${starPath(0, 0, 17)}"/>
+             <path class="dot dot-star" d="${starPath(0, 0, 11.5)}"/>`
           : `<circle class="dot" r="4.5"/>`}
       </g>`;
   });

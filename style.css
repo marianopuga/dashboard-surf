@@ -733,12 +733,16 @@ a:hover { color: var(--coffee-deep); }
     animation: star-breathe 3.2s ease-in-out infinite;
   }
 }
-/* The star is the marker itself, so it takes the tier colours the dot would
-   have taken — but always filled, never the hollow "flat" treatment, because
-   nothing is starred unless it is worth the trip. */
-.pin.is-best .dot-star { fill: var(--coffee); stroke: var(--parchment-lit); stroke-width: 1.2; }
+/* The star is the marker itself, so it carries the tier the same way the dot
+   it replaced did. The best spot is always starred — including on a flat hour,
+   where it goes hollow rather than vanishing: the star blinking out as the
+   slider crossed a flat stretch read as a fault, and the least bad option is
+   still the answer to where you would go. */
+.pin.is-best .dot-star { fill: var(--coffee); stroke: var(--parchment-lit); stroke-width: 1.3; }
 .pin.is-best.q-epic .dot-star,
 .pin.is-best.q-pumping .dot-star { fill: var(--raisin); }
+.pin.is-best.q-flat .dot-star { fill: none; stroke: var(--coffee-mid); stroke-width: 1.6; }
+.pin.is-best.q-flat .star-glow { display: none; }
 @keyframes star-breathe {
   0%,100% { opacity: 0.10; transform: scale(0.94); }
   50%     { opacity: 0.30; transform: scale(1.14); }
