@@ -307,10 +307,11 @@ body::after {
 @media (max-width: 480px) { .marginalia { display: none; } }
 
 /* --- the gutter marginalia -----------------------------------------------
-   The sea unicorn, in the left margin, fixed like the corner plates so it
-   holds position as the page scrolls.
+   Gessner's sea orm, in the left margin, fixed like the corner plates.
 
-   It is a wide, shallow plate, so it takes the tuck: flush with the window
+   It is a wide, shallow plate — wider than the one it replaced, which is why
+   the two swapped: at 2.077:1 it takes the tuck far better than it sat in the
+   bottom band. Flush with the window
    edge and exactly twice the gutter wide, with the outer half filling the
    margin and the inner half running under the content column. That reads as a
    plate slipped beneath the sheet. Two things it is deliberately NOT: pushed
@@ -345,12 +346,12 @@ body::after {
     opacity: 0.46;
     width: min(400px, calc(100vw - 1180px));
   }
-  /* Raised, so its tail lands in the gap between the conditions panel and the
+  /* Raised, so its coils land in the gap between the conditions panel and the
      chart rather than disappearing behind one of them. */
-  .marg-unicorn {
+  .marg-orm {
     left: 0;
     top: 24%;
-    aspect-ratio: 575 / 431;
+    aspect-ratio: 887 / 427;
     transform: rotate(-4deg);
   }
 }
@@ -1388,31 +1389,32 @@ a:hover { color: var(--coffee-deep); }
 /* The one heading that sits on the bare ground rather than on a panel. */
 #sheet-heading { color: var(--ink-on-ground); }
 
-/* Gessner's sea orm, across the bottom centre, between the two corner plates.
+/* The sea unicorn, across the bottom centre between the two corner plates.
    
-   It sits in the fixed layer with the rest of them now rather than inside the
-   colophon. That is what the mix cost: held to its block it scrolled while the
-   other four stayed put.
+   Sized to sit in the SAME BOX the sea orm had rather than at the same width:
+   the orm is 2.077:1 and this is 1.552:1, so matching widths would have made
+   it half again as tall and pushed it up through the colophon. Matching the
+   height instead keeps the band exactly where it was —
    
-   Its sea is gone. The plate is a woodcut of a serpent in a hatched ocean, and
-   the hatching is what read as fog — it could not be removed by tone, because
-   the sea's strokes and the creature's outlines occupy exactly the same
-   luminance range. They separate on local ink DENSITY instead: the creature is
-   a dense mass of line, the sea is thin strokes with white between them, so
-   blurring the ink heavily and keeping only what sits in a dense neighbourhood
-   drops the water and leaves the animal. Ink below L110 went 20.2% -> 16.3%.
+       width = ormWidth * 1.552 / 2.077 = 0.747 * ormWidth
    
-   Darker than it was, at the cost the note below records. */
-.marg-orm {
+   which is min(560px, 44vw) * 0.747 = min(418px, 33vw).
+   
+   Its sea and the scrap of coastline above the tail are gone. The waves came
+   out on local ink density, the same way the orm's did — dense mass keeps,
+   thin strokes with white between them go. The coastline could not: it is
+   engraved identically to the creature and separates from it by neither tone
+   nor density, only by POSITION, so it is cleared by position. */
+.marg-unicorn {
   left: 50%;
   top: auto;
   bottom: 0;
-  width: min(560px, 44vw);
-  aspect-ratio: 887 / 427;
+  width: min(418px, 33vw);
+  aspect-ratio: 450 / 290;
   opacity: 0.46;
   transform: translate(-50%, 16%) rotate(-1deg);
 }
-@media (max-width: 600px) { .marg-orm { display: none; } }
+@media (max-width: 600px) { .marg-unicorn { display: none; } }
 
 .colophon dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s5); margin: 0; }
 /* `.label` sets its own colour, so these do not inherit the on-ground ink the
