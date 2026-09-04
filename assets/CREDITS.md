@@ -7,7 +7,8 @@ Supplied by the project owner.
 | `treasure-map.webp` | source plate the galleon is cut from | not rendered directly |
 | `ship-cutout.png` | the galleon, pre-cut from `treasure-map.webp` | coast chart |
 | `sea-monster.webp` | lone sea monster, antique map detail | masthead marginalia |
-| `sea-serpent.webp` | sea serpent | masthead marginalia |
+| `gessner-serpent.jpg` | Conrad Gessner, *Historiae Animalium* IV (1558) — his reversed woodcut of Olaus Magnus's sea orm | masthead marginalia, left |
+| `sea-serpent.webp` | sea serpent | unused, replaced by the Gessner |
 | `ouroboros.webp` | serpent taking its tail | unused |
 | `sea-unicorn.jpg` | sea unicorn, antique map detail | page marginalia, left |
 | `sea-dragon.jpg` | sea dragon woodcut | page marginalia, right |

@@ -230,12 +230,17 @@
   .marg-kraken { transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 15%) rotate(3deg); }
 }
 
+/* Gessner's 1558 woodcut of Olaus Magnus's sea orm — the serpent taking a ship
+   by the mast. It is a wide, shallow plate (2.08:1) where the one it replaced
+   was square, so it is framed to its own aspect and bled further off the left:
+   the serpent's coils fill the margin and the ship it has hold of sits inward,
+   under the masthead's whitespace. Cropping it square instead would have
+   thrown away either the coils or the ship, and the two together are the
+   picture. */
 .marg-serpent {
   left: 0;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  object-position: 55% 45%;   /* the coiled body, away from the caption */
-  transform: translate(-16%, -30%) rotate(-6deg);
+  aspect-ratio: 887 / 427;
+  transform: translate(-22%, -6%) rotate(-4deg);
 }
 .marg-monster {
   right: 0;
@@ -272,7 +277,7 @@ body::after {
 /* A genuine gutter exists beyond this, so they can come fully on-page. */
 @media (min-width: 1400px) {
   .marg { opacity: 0.6; width: clamp(240px, 22vw, 420px); }
-  .marg-serpent { transform: translate(-4%, -26%) rotate(-6deg); }
+  .marg-serpent { transform: translate(-8%, -4%) rotate(-4deg); }
   .marg-monster { transform: translate(4%, -18%) rotate(4deg) scaleX(-1); }
 }
 @media (max-width: 820px) { .marg { opacity: 0.4; } }
