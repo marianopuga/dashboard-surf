@@ -721,8 +721,11 @@ function renderChart(rows, cond, activeId) {
               // stroke's broad parchment pass paints straight over the first
               // stroke's ink and rubs out half the X.
               const d = xMark(18);
-              // Tilted, because nothing drawn by hand lands square to the page.
-              return `<g transform="rotate(-8)">`
+              // A slight tilt, because nothing drawn by hand lands square to
+              // the page — but only slight. At -8 it read as leaning rather
+              // than as hand-made, and the mark's own irregularity is already
+              // doing that work.
+              return `<g transform="rotate(-3)">`
                    + d.map((p) => `<path class="x-clear" d="${p}"/>`).join("")
                    + d.map((p) => `<path class="x-ink" d="${p}"/>`).join("")
                    + `</g>`;
