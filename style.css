@@ -148,21 +148,15 @@
   position: absolute;
   display: block;
   filter: url(#ink-stamp);
-  /* ONE opacity for every plate. The groups used to carry their own (0.55 for
-     the corners, 0.46 for the gutter) on top of source images with wildly
-     different ink weight, so some read crisp and others foggy. The plates are
-     now levelled to a common ink profile offline — see assets/CREDITS.md — and
-     the density difference is gone, which means they can and should all sit at
-     the same weight here. */
-  opacity: 0.52;
+  opacity: 0.6;
   /* The ink-stamp drops white paper, but these plates sit on hatched blue sea,
      which has mid luminance and therefore survives as a visible rectangle. A
      soft mask dissolves the plate edge so it reads as ink bled into the page
      rather than a photograph pasted onto it. */
-  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%,
-    #000 42%, rgba(0,0,0,0.55) 68%, transparent 88%);
-  mask-image: radial-gradient(ellipse 62% 62% at 50% 50%,
-    #000 42%, rgba(0,0,0,0.55) 68%, transparent 88%);
+  -webkit-mask-image: radial-gradient(ellipse 68% 68% at 50% 50%,
+    #000 50%, rgba(0,0,0,0.66) 74%, transparent 92%);
+  mask-image: radial-gradient(ellipse 68% 68% at 50% 50%,
+    #000 50%, rgba(0,0,0,0.66) 74%, transparent 92%);
 }
 /* Cropped to the creature: `cover` plus an object-position that pushes the
    unwanted half of the plate out of the frame. */
@@ -201,16 +195,20 @@
 .marg-dragon {
   right: 0;
   aspect-ratio: 800 / 769;
-  transform: translate(16%, 22%) rotate(5deg) scaleX(-1);
+  transform: translate(24%, 22%) rotate(5deg) scaleX(-1);
 }
+/* A little smaller than the other corner plates — it is a dense, busy image
+   (a whole creature plus three galleons) where the others are a single
+   creature, so at matched width it carried far more ink than its share. */
 .marg-kraken {
   left: 0;
+  width: clamp(110px, 23vw, 380px);
   aspect-ratio: 405 / 390;
   transform: translate(-14%, 20%) rotate(3deg);
 }
 @media (min-width: 1400px) {
-  .marg-dragon { transform: translate(4%, 16%) rotate(5deg) scaleX(-1); }
-  .marg-kraken { transform: translate(-4%, 15%) rotate(3deg); }
+  .marg-dragon { transform: translate(12%, 16%) rotate(5deg) scaleX(-1); }
+  .marg-kraken { width: clamp(190px, 17vw, 345px); transform: translate(-4%, 15%) rotate(3deg); }
 }
 
 .marg-serpent {
@@ -284,15 +282,20 @@ body::after {
   /* A gentler edge than the corner plates. `.marg` dissolves everything
      outside the middle 42%, which suits a creature bleeding off the page but
      would eat most of one meant to be looked at. */
-  -webkit-mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
-    #000 0 76%, rgba(0,0,0,0.65) 90%, transparent 100%);
-  mask-image: radial-gradient(ellipse 82% 82% at 50% 50%,
-    #000 0 76%, rgba(0,0,0,0.65) 90%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 86% 86% at 50% 50%,
+    #000 0 80%, rgba(0,0,0,0.74) 92%, transparent 100%);
+  mask-image: radial-gradient(ellipse 86% 86% at 50% 50%,
+    #000 0 80%, rgba(0,0,0,0.74) 92%, transparent 100%);
+}
+
+@media (min-width: 1800px) {
+  .marg-lower { opacity: 0.55; }
 }
 
 @media (min-width: 1340px) {
   .marg-lower {
     display: block;
+    opacity: 0.46;
     width: min(400px, calc(100vw - 1180px));
   }
   /* Raised, so its tail lands in the gap between the conditions panel and the

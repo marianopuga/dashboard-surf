@@ -15,33 +15,22 @@ Supplied by the project owner.
 | `an-old-map-of-the-world-with-a-map-of-the-world-photo.jpg` | unused — see below | not rendered |
 | `paper-fibre.png` | paper tooth | `body` background, tiled |
 
-## Why the plates are levelled before use
+## Why the plates are NOT levelled
 
-All five marginalia go through one shared SVG filter (`#ink-stamp`), which
-turns luminance into alpha: below L=0.267 a pixel is solid ink, above L=0.6 it
-is gone, and in between it is partly transparent. That middle band is what
-reads as fog.
+Tried and reverted. All five go through one shared SVG filter (`#ink-stamp`)
+which turns luminance into alpha — solid below L=0.267, gone above L=0.6, part
+transparent in between — and the sources disagree about how much of themselves
+sit in that middle band: 8% for the sea dragon, 34% for the kraken. On paper
+that explains why one reads crisp and another soft, and levelling each plate to
+a common histogram does even them out.
 
-The sources disagreed wildly about how much of themselves sat in it:
+It also ruins them. What the levelling removes is exactly the half-tone wash
+that makes an engraving look like an engraving; what comes back is hard black
+line art on parchment, which reads as clip-art pasted onto the page rather than
+as ink soaked into it. The unevenness is the aged-paper quality, not a defect.
 
-| plate | solid ink | partial (fog) |
-|---|---|---|
-| sea-serpent | 3.9% | 20.3% |
-| sea-monster | 10.5% | 24.4% |
-| sea-unicorn | 12.0% | 8.0% |
-| sea-dragon | 6.2% | 9.3% |
-| kraken | 15.3% | **34.4%** |
-
-So the two line engravings came out crisp and the kraken came out as a smudge —
-not because of anything in the CSS, but because a third of it is half-tone wash
-and the filter cannot tell wash from paper.
-
-Each plate is therefore levelled once, offline: auto-levelled to a common black
-and white, then put through the midpoint/contrast pair that lands its histogram
-on ~11% solid and ~9% partial. Afterwards the spread is 8.4–12.7% solid and
-6.6–10.1% partial, and every plate can sit at the same opacity in CSS.
-
-Originals are recoverable from git history if the curve ever needs redoing.
+Left alone deliberately. If a plate ever needs bringing forward, do it with its
+own opacity, not by flattening its tones.
 
 ## Why the kraken is a crop
 
