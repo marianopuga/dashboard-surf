@@ -30,8 +30,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * a physically exact one, and a clamped linear scale keeps light and violent
  * days both legible instead of one making the other invisible.
  */
-const lenForSwell = (hs) => hs == null ? 66 : clamp(32 + ((hs - 0.3) / 2.2) * 78, 32, 112);
-const lenForWind = (kmh) => kmh == null ? 58 : clamp(28 + (kmh / 35) * 74, 28, 104);
+const lenForSwell = (hs) => hs == null ? 56 : clamp(27 + ((hs - 0.3) / 2.2) * 68, 27, 95);
+const lenForWind = (kmh) => kmh == null ? 49 : clamp(24 + (kmh / 35) * 64, 24, 88);
 
 // angleDiff() and inArc() are defined in score.js, which loads first: the scoring
 // engine needs them and has to stay loadable on its own (test.html loads it
@@ -217,7 +217,7 @@ function arrowTo(x1, y1, x2, y2, k, filled, cased) {
   const dx = x2 - x1, dy = y2 - y1;
   const L = Math.hypot(dx, dy) || 1;
   const ux = dx / L, uy = dy / L;
-  const h = Math.min(18, L * 0.42);
+  const h = Math.min(15, L * 0.42);
 
   let shaftD, headD;
   if (filled) {

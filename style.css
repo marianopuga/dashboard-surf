@@ -669,18 +669,18 @@ a:hover { color: var(--coffee-deep); }
    names now — they are the reading, and a name should not hide one. */
 .swell-casing, .wind-casing {
   stroke: var(--paper-raised);
-  stroke-width: 6;
+  stroke-width: 5.2;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.85;
 }
-.swell-arrow { stroke: var(--coffee); stroke-width: 3.4; fill: none; stroke-linecap: round; }
+.swell-arrow { stroke: var(--coffee); stroke-width: 3; fill: none; stroke-linecap: round; }
 .swell-head  { fill: var(--coffee); }
 
 /* Wind: dashed shaft, open chevron, Olive — deliberately a different visual
    language, so the two are told apart by shape as well as by colour. */
-.wind-arrow { stroke: var(--olive); stroke-width: 3; fill: none; stroke-dasharray: 7 5; stroke-linecap: round; }
+.wind-arrow { stroke: var(--olive); stroke-width: 2.6; fill: none; stroke-dasharray: 7 5; stroke-linecap: round; }
 .wind-head  { stroke: var(--olive); stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
 /* --- pins --------------------------------------------------------------- */
