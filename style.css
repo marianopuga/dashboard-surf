@@ -137,8 +137,15 @@
 .gnd-rhumb-main { stroke-width: 1; opacity: 0.24; }
 .gnd-ring { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.34; }
 
+/* Absolute over the whole document, NOT fixed to the viewport. They used to be
+   fixed while the sea orm in the colophon scrolled, which is the worst of both:
+   some creatures travelled with you and one stayed with its block. Everything
+   scrolls now, so a plate belongs to a place on the page rather than to a
+   corner of the screen.
+   `inset: 0` against a positioned <body> stretches this to the document's full
+   height, so `bottom` on a plate means the foot of the PAGE. */
 .marginalia {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -185,7 +192,7 @@
    it does not depend on there being a margin at all. */
 .marg.marg-corner {
   top: auto;
-  bottom: 0;
+  bottom: 2%;
   width: clamp(130px, 29vw, 460px);
 }
 /* Both bottom plates bleed DOWN off the page as well as sideways. Sitting them
@@ -195,7 +202,8 @@
 .marg.marg-dragon {
   right: 0;
   aspect-ratio: 800 / 769;
-  transform: translate(24%, 12%) rotate(5deg) scaleX(-1);
+  /* Upright. The tilt read as a plate that had slipped, not as one placed. */
+  transform: translate(24%, 12%) scaleX(-1);
 }
 /* Anchored so the galleon at the top of the plate lines up with the left edge
    of the content column. The hull begins 38.3% across the image — measured off
@@ -249,7 +257,7 @@
 }
 
 @media (min-width: 1400px) {
-  .marg.marg-dragon { transform: translate(12%, 7%) rotate(5deg) scaleX(-1); }
+  .marg.marg-dragon { transform: translate(12%, 7%) scaleX(-1); }
   .marg.marg-kraken { transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 15%) rotate(3deg); }
 }
 
@@ -344,7 +352,8 @@ body::after {
      chart rather than disappearing behind one of them. */
   .marg-unicorn {
     left: 0;
-    top: 24%;
+    /* A fifth of the way down the DOCUMENT now that the layer is not fixed. */
+    top: 20%;
     aspect-ratio: 575 / 431;
     transform: rotate(-4deg);
   }
@@ -371,6 +380,7 @@ body::after {
    colour cannot.
    ========================================================================== */
 body {
+  position: relative;   /* the marginalia layer measures itself against this */
   margin: 0;
   background-color: var(--parchment);
   background-image:
@@ -1391,10 +1401,16 @@ a:hover { color: var(--coffee-deep); }
    gutters it would have had to be cropped to a column, which costs either the
    coils or the ship, and the two together are the picture.
    
-   Its opacity is lower than every other plate and that figure is measured, not
-   chosen: the colophon's text sits directly on top of it, and at 0.34 the
-   darkest ink the filter can put under a letter still leaves 4.6:1. At 0.4 it
-   is 4.2:1 and fails. */
+   It reads fainter than the plates either side of it because its source is a
+   soft woodcut — a quarter of it was mid-tone wash, which the ink filter turns
+   into fog. Fixed at the image rather than here: a 55% unsharp mask lifts its
+   contours 47% while keeping 70% of the wash. Raising opacity alone would have
+   darkened the fog as much as the lines, which is the thing that looks foggy.
+   
+   The opacity is still the lowest on the page and that figure is measured, not
+   chosen: the colophon's text sits over the top of the plate, and 0.34 is where
+   the darkest ink the filter can put under a letter still leaves 4.6:1. At 0.4
+   it is 4.2:1 and fails AA. */
 .colophon { position: relative; }
 .marg-orm {
   position: absolute;
@@ -1421,7 +1437,7 @@ a:hover { color: var(--coffee-deep); }
   width: min(560px, 56%);
   aspect-ratio: 887 / 427;
   z-index: -1;
-  opacity: 0.32;
+  opacity: 0.34;
   transform: translateX(-50%) rotate(-1deg);
 }
 /* Below this the colophon collapses to a single narrow column and a 2.08:1

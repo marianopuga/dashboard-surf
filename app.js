@@ -1436,21 +1436,25 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
 }
 
 /**
- * Publish where the content column's VISIBLE edge actually is, as --panel-left.
+ * Publish the left edge of the chart plate as --panel-left.
  *
- * The kraken in the bottom-left margin is positioned so its galleon lines up
- * with that edge, and every previous attempt computed it as
- * `calc((100vw - 1180px) / 2)` — the wrap's border box. That is not where the
- * panels start: they begin one padding further in, and the padding changes with
- * the viewport. So the ship was landing a fixed distance short at every width,
- * and each "fix" was refining the wrong target.
+ * The kraken in the bottom-left margin lines its galleon up with that edge.
+ * Every earlier attempt computed it instead — `calc((100vw - 1180px) / 2)` —
+ * and was wrong twice over: that is the wrap's border box, not where a panel
+ * starts, and the panels do not even agree with each other.
  *
  * Measured rather than derived, because the value depends on padding that
  * lives in media queries; anything computed in CSS has to duplicate those
  * rules and will drift the moment one of them changes.
  */
 function publishColumnEdge() {
-  const panel = document.querySelector(".conditions") || document.querySelector(".wrap");
+  // The chart plate specifically — "the box the map is inside of". It is NOT
+  // in line with the other panels: it measures 210 where the conditions strip
+  // measures 234 on a 1600px window, a 24px difference that is exactly what
+  // read as the ship sitting too far right.
+  const panel = document.querySelector(".chart-plate")
+             || document.querySelector(".conditions")
+             || document.querySelector(".wrap");
   if (!panel) return;
   const x = Math.max(0, Math.round(panel.getBoundingClientRect().left));
   document.documentElement.style.setProperty("--panel-left", `${x}px`);
