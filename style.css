@@ -21,8 +21,8 @@
      at rgb(176,139,78). The page ground is that tone; the sheets laid on it
      are the same hue lifted toward the light, so everything reads as one
      batch of paper under one lamp rather than as unrelated greys. */
-  --parchment-deep: #8A6A38;  /* darkest ground, page edges and vignette      */
-  --parchment:      #C7A971;  /* the ground the content sits on               */
+  --parchment-deep: #9A7A46;  /* darkest ground, page edges and vignette      */
+  --parchment:      #D6BC8E;  /* the ground the content sits on               */
   --parchment-lit:  #F0E4CB;  /* the brightest paper — highlights, star edge  */
   --paper-raised:   #EADCBE;  /* cards and the sheet — fresher paper, 10:1    */
   --paper:          #DCC7A0;  /* mid tone, chart sea                          */
@@ -41,6 +41,13 @@
                                4.2:1 once the ground went from Salt to
                                parchment — it read fine on near-white and
                                failed AA on tan.                           */
+  --ink-on-ground: #4E4A38; /* 4.9:1 on bare --parchment. Most muted text sits
+                               on a panel, where --ink-muted is comfortable;
+                               the masthead, the sheet heading and the
+                               colophon do not, and out there --ink-muted is
+                               4.2:1 — under AA. One step darker rather than
+                               lightening the whole ground further, which
+                               would have flattened the panels into it.    */
                             /* (raw Antique is 3.3:1 — fine for lines and
                                graphics, too weak for small text)          */
 
@@ -182,9 +189,11 @@ body::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  /* Eased off with the lighter ground: the same burn that read as handling
+     on the darker parchment read as a heavy dark frame on this one. */
   background:
-    radial-gradient(ellipse 78% 74% at 50% 48%,
-      transparent 52%, rgba(74, 48, 16, 0.30) 88%, rgba(58, 36, 10, 0.46) 100%);
+    radial-gradient(ellipse 82% 78% at 50% 48%,
+      transparent 56%, rgba(74, 48, 16, 0.17) 88%, rgba(58, 36, 10, 0.28) 100%);
 }
 
 /* A genuine gutter exists beyond this, so they can come fully on-page. */
@@ -274,10 +283,10 @@ a:hover { color: var(--coffee-deep); }
   line-height: 1.1;
   font-variation-settings: "SOFT" 0, "WONK" 1, "opsz" 60;
 }
-.masthead .kicker { margin: 0 0 var(--s3); }
+.masthead .kicker { margin: 0 0 var(--s3); color: var(--ink-on-ground); }
 .masthead .sub {
   margin: var(--s2) 0 0;
-  color: var(--ink-muted);
+  color: var(--ink-on-ground);
   font-size: var(--t-small);
 }
 
@@ -1141,10 +1150,15 @@ a:hover { color: var(--coffee-deep); }
   border-top: 1px solid var(--rule);
   padding: var(--s5) 0 var(--s8);
   font-size: var(--t-small);
-  color: var(--ink-muted);
+  color: var(--ink-on-ground);
 }
+/* The one heading that sits on the bare ground rather than on a panel. */
+#sheet-heading { color: var(--ink-on-ground); }
+
 .colophon dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s5); margin: 0; }
-.colophon dt { margin-bottom: var(--s1); }
+/* `.label` sets its own colour, so these do not inherit the on-ground ink the
+   .colophon block sets — they have to be told directly. */
+.colophon dt { margin-bottom: var(--s1); color: var(--ink-on-ground); }
 .colophon dd { margin: 0; }
 
 /* ==========================================================================
