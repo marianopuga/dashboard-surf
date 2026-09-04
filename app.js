@@ -248,8 +248,11 @@ function arrowTo(x1, y1, x2, y2, k, filled, cased) {
 /** Compass-anchored arrow, centred on (cx,cy), pointing the way energy travels. */
 function bearingArrow(cx, cy, from, len, k, filled) {
   const d = vec((from + 180) % 360);
+  // Always cased. On the chart these are drawn over the spot labels — the
+  // arrows are the reading and a name should not hide one — and a dark arrow
+  // laid straight across dark letters is mush without a casing to separate it.
   return arrowTo(cx - d.x * len / 2, cy - d.y * len / 2,
-                 cx + d.x * len / 2, cy + d.y * len / 2, k, filled);
+                 cx + d.x * len / 2, cy + d.y * len / 2, k, filled, true);
 }
 
 const swellArrow = (cx, cy, from, len = 30, k = "swell") => bearingArrow(cx, cy, from, len, k, true);
@@ -367,14 +370,13 @@ const FLEET = [
 ];
 
 // The shipping lane, traced from the course drawn on the chart: up the outside
-// of the swell, well off the beaches, bowing west through the middle and then
-// bending back out to sea past Long Reef.
+// of the swell, well off the beaches, bowing west through the middle.
 //
-// Two adjustments to what was drawn. It is shifted ~18 units west, because the
-// line as drawn sat on the plate's own right edge and a hull centred there
-// would have been sliced in half by the viewBox; and the hook at the very top
-// runs off the chart, which is kept as a fade rather than as geometry — the
-// ship thins out as it leaves rather than being clipped.
+// Three adjustments to what was drawn. It is shifted ~18 units west, because
+// the line as drawn sat on the plate's own right edge and a hull centred there
+// would have been sliced in half by the viewBox. The hook at the very top is
+// gone entirely — see NO_GO_Y. And what remains ends far enough south that a
+// hull has faded out completely before it could reach the closed water.
 //
 // Ordered bottom (where a ship appears) to top (where it goes).
 const ROUTE = [
@@ -383,16 +385,22 @@ const ROUTE = [
   { x: 285, y: 411 },
   { x: 282, y: 368 },
   { x: 279, y: 324 },
-  { x: 273, y: 273 },
-  { x: 267, y: 222 },
-  { x: 261, y: 178 },
-  { x: 260, y: 134 },   // the westernmost point of the bow
-  { x: 262, y: 90 },
-  { x: 273, y: 50 },    // bending back out around Long Reef
-  { x: 289, y: 14 },
-  { x: 296, y: -15 },
-  { x: 298, y: -30 },   // gone
+  { x: 274, y: 276 },
+  { x: 269, y: 228 },
+  { x: 265, y: 185 },
+  { x: 263, y: 150 },
+  { x: 262, y: 130 },   // gone, and well south of the closed water
 ];
+
+// Closed water: nothing may put a pixel north of this line. Marked out on the
+// chart by hand — it is the corner off the Long Reef headland, where the sea
+// narrows between the point and the edge of the plate.
+//
+// The rule is about the HULL, not the track: a ship is ~65 units tall and only
+// its midpoint rides the route, so the route has to stop a half-height plus a
+// margin short of the line. It is enforced in shipTrack rather than left to
+// the route numbers, so the boundary survives anyone editing the course.
+const NO_GO_Y = 90;
 const LANE_Y1 = ROUTE[0].y;
 const LANE_Y0 = ROUTE[ROUTE.length - 1].y;
 
@@ -430,6 +438,9 @@ function shipTrack(off, beam, halfH) {
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
   const reach = halfH + span;
   const eastLimit = COAST.W - 6 - beam;
+  // The furthest north a hull's CENTRE may sit and still keep every pixel of
+  // itself south of the closed water.
+  const northLimit = NO_GO_Y + halfH + 6;
 
   for (let i = 0; i <= N; i++) {
     const t = i / N;
@@ -445,7 +456,10 @@ function shipTrack(off, beam, halfH) {
       shore = Math.max(shore, SHORE_X(clamp(y + d, 0, COAST.H)));
     }
     const westLimit = shore + beam + MIN_CLEAR;
-    pts.push({ x: clamp(routeX, Math.min(westLimit, eastLimit), eastLimit), y });
+    pts.push({
+      x: clamp(routeX, Math.min(westLimit, eastLimit), eastLimit),
+      y: Math.max(y, northLimit),
+    });
   }
   return pts;
 }
@@ -545,15 +559,22 @@ function sailFleet(svg) {
   });
 }
 
-/** A five-pointed star, points up, centred on (cx,cy) with circumradius r. */
-function starPath(cx, cy, r, inner = 0.42) {
-  const pts = [];
-  for (let i = 0; i < 10; i++) {
-    const a = (-90 + i * 36) * (Math.PI / 180);
-    const rr = i % 2 ? r * inner : r;
-    pts.push(`${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)}`);
-  }
-  return `M${pts.join("L")}Z`;
+/**
+ * The mark on the best spot: an X, the way a treasure map marks the place.
+ *
+ * Two strokes, not a glyph. Each one bows slightly and neither is quite the
+ * length or angle of the other, because a cross drawn with two straight equal
+ * lines reads as a multiplication sign — the whole character of the mark is
+ * that a hand made it in a hurry.
+ */
+function xMark(r) {
+  const n = (v) => v.toFixed(1);
+  return [
+    // down-right: bows a little below the true diagonal
+    `M${n(-r)} ${n(-r * 0.94)} Q${n(-r * 0.06)} ${n(r * 0.1)} ${n(r * 0.98)} ${n(r)}`,
+    // down-left: crosses slightly above centre and overshoots the first
+    `M${n(r * 0.92)} ${n(-r)} Q${n(r * 0.04)} ${n(-r * 0.08)} ${n(-r)} ${n(r * 0.9)}`,
+  ];
 }
 
 /**
@@ -640,6 +661,7 @@ function renderChart(rows, cond, activeId) {
   // Split into two layers: the active spot's geometry sits under every pin, so
   // a wedge can never cover a neighbouring dot.
   const geometry = [];
+  const arrows = [];
   const pins = rows.map(({ spot, score }) => {
     const p = spot.xy;
     const isActive = spot.id === activeId;
@@ -650,6 +672,17 @@ function renderChart(rows, cond, activeId) {
       const f = vec(spot.facing_deg);
       const e0 = vec(spot.swell_window[0]), e1 = vec(spot.swell_window[1]);
       const n = (v) => v.toFixed(1);
+      // The window, its edges and the shore-normal stay UNDER the pins, so a
+      // wedge can never cover a neighbouring dot. The two arrows do not: they
+      // go in their own layer above everything, including the labels.
+      arrows.push(
+        swellFrom != null
+          ? swellArrow(p.x + vec(swellFrom).x * 86, p.y + vec(swellFrom).y * 86, swellFrom, swellLen)
+          : "",
+        windFrom != null
+          ? windArrow(p.x + vec(windFrom).x * 62, p.y + vec(windFrom).y * 62, windFrom, windLen)
+          : ""
+      );
       geometry.push(
         wedge(p.x, p.y, R, spot.swell_window[0], spot.swell_window[1], "window-wedge"),
         `<path class="window-edge" d="M${n(p.x)} ${n(p.y)} L${n(p.x + e0.x * R)} ${n(p.y + e0.y * R)}
@@ -657,17 +690,7 @@ function renderChart(rows, cond, activeId) {
         // The shore-normal tick is the reference the swell arrow is read against:
         // the angle between the two IS the incidence, straight off the drawing.
         `<line class="shore-normal" x1="${n(p.x)}" y1="${n(p.y)}"
-           x2="${n(p.x + f.x * 34)}" y2="${n(p.y + f.y * 34)}"/>`,
-        // Both arrows repeated at the selected spot, held off so they don't
-        // collide with the label — swell in Coffee, wind in Olive, so the two
-        // are told apart by colour as well as by shaft style even this close
-        // together. Both scale with the same energy the field arrows use.
-        swellFrom != null
-          ? swellArrow(p.x + vec(swellFrom).x * 86, p.y + vec(swellFrom).y * 86, swellFrom, swellLen)
-          : "",
-        windFrom != null
-          ? windArrow(p.x + vec(windFrom).x * 62, p.y + vec(windFrom).y * 62, windFrom, windLen)
-          : ""
+           x2="${n(p.x + f.x * 34)}" y2="${n(p.y + f.y * 34)}"/>`
       );
     }
     // The best spot's marker IS a star — it replaces the dot rather than
@@ -677,10 +700,17 @@ function renderChart(rows, cond, activeId) {
     return `<g class="pin ${score.tierCls} ${isActive ? "is-active" : ""} ${isBest ? "is-best" : ""}"
               data-spot="${spot.id}"
               transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})">
-        <circle class="halo" r="${isBest ? 17 : 9}"/>
+        <circle class="halo" r="${isBest ? 20 : 9}"/>
         ${isBest
-          ? `<path class="star-glow" d="${starPath(0, 0, 20)}"/>
-             <path class="dot dot-star" d="${starPath(0, 0, 13.5)}"/>`
+          ? (() => {
+              // BOTH clearing strokes go down before EITHER ink stroke.
+              // Interleaving them (clear, ink, clear, ink) means the second
+              // stroke's broad parchment pass paints straight over the first
+              // stroke's ink and rubs out half the X.
+              const d = xMark(18);
+              return d.map((p) => `<path class="x-clear" d="${p}"/>`).join("")
+                   + d.map((p) => `<path class="x-ink" d="${p}"/>`).join("");
+            })()
           : `<circle class="dot" r="4.5"/>`}
       </g>`;
   });
@@ -765,6 +795,7 @@ function renderChart(rows, cond, activeId) {
     ${geometry.join("")}
     ${pins.join("")}
     ${labels.join("")}
+    ${arrows.join("")}
     ${tideGauge(cond, VIEW.x + 16, 108)}
     ${cartouche(active, activeScore, cond, VIEW.x + VIEW.w - CART_W - 10, COAST.H - 130, CART_W)}
   `;

@@ -57,6 +57,12 @@
 
   /* --- accents ----------------------------------------------------------- */
   --coffee-deep: #5A3C25;   /* pressed / hover                              */
+  --treasure: #8E2F20;      /* the X, and only the X. The one colour on the
+                               page from outside the six — an oxide red, the
+                               shade a treasure mark is always painted in, and
+                               deliberately unlike anything else here so the
+                               mark cannot be confused with data. 6.0:1 on the
+                               chart's sea.                                 */
   --coffee-mid:  #9A7550;   /* Coffee @55% — meters, secondary marks        */
   --coffee-wash: #DDC7A0;   /* Coffee @12% — tinted fills                   */
   --olive-mid:   #8A8B78;   /* Olive @55%                                   */
@@ -222,63 +228,59 @@ body::after {
 
 /* --- the lower marginalia ------------------------------------------------
    Three more engravings down the two gutters, fixed like the pair above so
-   they hold their place as the page scrolls.
+   they hold position as the page scrolls.
 
-   They follow the same rule the top pair do: bled off the edge so only what
-   reaches in from the border shows, and given more of themselves as the window
-   widens and a real gutter opens up beside the 1180px column. Below 980px
-   there is no margin worth speaking of and they go entirely — unlike the top
-   pair, which have the masthead's own whitespace to sit in, these are level
-   with dense content and a sliver over a forecast strip is just noise.
+   Sizing them to fit *inside* the gutter was wrong twice over: it made them
+   small enough to read as smudges, and it was solving the wrong problem. What
+   was actually wrong before was that they were pushed 42% off the left and
+   right of the window — cut by the screen edge, which always looks like a
+   mistake.
 
-   They also sit lighter than the top pair, because down here they are behind
-   the reading rather than beside a title. */
+   So they now sit flush with the window edge and are exactly twice the gutter
+   wide. The outer half fills the margin; the inner half runs under the content
+   column, which reads as a plate tucked beneath the sheet rather than as one
+   sliced off. Nothing is ever cut by the viewport.
+
+       (100vw - 1180px)   is twice the gutter beside the content column
+
+   Below 1340px that is under 160px and there is not enough margin for these to
+   be anything but noise, so they are dropped. */
 .marg-lower {
   display: none;
   top: auto;
   aspect-ratio: auto;
 }
 
-@media (min-width: 980px) {
+@media (min-width: 1340px) {
   .marg-lower {
     display: block;
-    opacity: 0.3;
-    width: clamp(150px, 14vw, 300px);
+    opacity: 0.46;
+    width: min(400px, calc(100vw - 1180px));
   }
+  /* Flush with the window edge, so the cut is never at the screen. */
   .marg-unicorn {
     left: 0;
-    top: 34%;
+    top: 33%;
     aspect-ratio: 575 / 431;
-    transform: translate(-42%, 0) rotate(-4deg);
+    transform: rotate(-4deg);
   }
   .marg-dragon {
     right: 0;
-    top: 28%;
+    top: 27%;
     aspect-ratio: 800 / 769;
-    transform: translate(42%, 0) rotate(5deg) scaleX(-1);
+    transform: rotate(5deg) scaleX(-1);
   }
   .marg-kraken {
     left: 0;
     bottom: 5%;
     aspect-ratio: 405 / 390;
-    transform: translate(-44%, 0) rotate(3deg);
+    transform: rotate(3deg);
   }
 }
 
-/* A real gutter starts to open here, so they come further on-page. */
-@media (min-width: 1280px) {
-  .marg-lower { opacity: 0.4; width: clamp(200px, 15vw, 320px); }
-  .marg-unicorn { transform: translate(-16%, 0) rotate(-4deg); }
-  .marg-dragon  { transform: translate(16%, 0) rotate(5deg) scaleX(-1); }
-  .marg-kraken  { transform: translate(-18%, 0) rotate(3deg); }
-}
-
-/* Fully clear of the column: they can sit in the margin and carry more ink. */
-@media (min-width: 1600px) {
-  .marg-lower { opacity: 0.5; width: clamp(240px, 17vw, 360px); }
-  .marg-unicorn { transform: translate(-2%, 0) rotate(-4deg); }
-  .marg-dragon  { transform: translate(2%, 0) rotate(5deg) scaleX(-1); }
-  .marg-kraken  { transform: translate(0, 0) rotate(3deg); }
+/* A wide margin can carry more ink without crowding anything. */
+@media (min-width: 1800px) {
+  .marg-lower { opacity: 0.55; }
 }
 
 /* ==========================================================================
@@ -632,6 +634,17 @@ a:hover { color: var(--coffee-deep); }
 .crest-0 { stroke-width: 1.5; opacity: 0.34; }
 .crest-1 { stroke-width: 0.7; opacity: 0.18; }
 .crest-2 { stroke-width: 0.9; opacity: 0.24; }
+/* Casings: a broad parchment pass under each arrow, so it stays readable where
+   it crosses a spot label or the swell field. The arrows are drawn above the
+   names now — they are the reading, and a name should not hide one. */
+.swell-casing, .wind-casing {
+  stroke: var(--paper-raised);
+  stroke-width: 6;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
 .swell-arrow { stroke: var(--coffee); stroke-width: 3.4; fill: none; stroke-linecap: round; }
 .swell-head  { fill: var(--coffee); }
 
@@ -834,38 +847,48 @@ a:hover { color: var(--coffee-deep); }
   100% { transform: translateY(0.7px); }
 }
 
-/* --- the star on the best spot ------------------------------------------ */
+/* --- the X on the best spot ---------------------------------------------- */
 /* An old chart marks the place worth sailing to, and this is the only mark on
-   the map that answers "where do I go" without having to be read. It sits
-   under the pins so the dot it marks stays legible through it. */
-.pin .dot-star { stroke-linejoin: round; }
-/* A filled star behind the mark, not a stroked one — a second outline read as
-   a cog rather than as a halo. */
-.star-glow { fill: var(--coffee); stroke: none; opacity: 0.20; }
+   the map that answers "where do I go" without having to be read. */
+.best-x { pointer-events: none; }
+
+/* The broad pass under each stroke: parchment, wide, so the mark clears the
+   swell lines out from under itself the way wet ink would. Drawn per stroke
+   rather than as one shape behind both, so the clearing follows the X and does
+   not show as a box. */
+.pin .x-clear {
+  fill: none;
+  stroke: var(--parchment-lit);
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+/* One colour, always. The X used to take the tier's ink like the dot it
+   replaced did — darker when pumping, lighter when flat — so it changed shade
+   as the slider moved and looked like it was losing its colour. A treasure
+   mark is not a reading; it says "here" and nothing else, so it is the same
+   red at every hour. What the conditions are is the badge's job. */
+/* Scoped under .pin and NOT sharing the dot's class. It used to carry `dot`
+   as well, and `.pin.q-ok .dot` — two classes to this rule's one — quietly won:
+   the X was drawn in the tier's coffee at the dot's 1.5px, and changed shade
+   as the tier changed. That is what "it loses its colour" was. */
+.pin .x-ink {
+  fill: none;
+  stroke: var(--treasure);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .star-glow {
+  .pin.is-best .halo {
     transform-box: fill-box;
     transform-origin: center;
-    animation: star-breathe 3.2s ease-in-out infinite;
+    animation: x-breathe 3.2s ease-in-out infinite;
   }
 }
-/* The star is the marker itself, so it carries the tier the same way the dot
-   it replaced did. The best spot is always starred — including on a flat hour,
-   where it goes hollow rather than vanishing: the star blinking out as the
-   slider crossed a flat stretch read as a fault, and the least bad option is
-   still the answer to where you would go. */
-.pin.is-best .dot-star { fill: var(--coffee); stroke: var(--parchment-lit); stroke-width: 1.3; }
-.pin.is-best.q-epic .dot-star,
-.pin.is-best.q-pumping .dot-star { fill: var(--raisin); }
-/* A flat hour is told by a lighter fill, never by a hollow star. Outlining it
-   read as an unfinished or broken mark rather than as a quieter one — the star
-   is the map's single "go here", and it should always look like a mark that
-   was made on purpose. */
-.pin.is-best.q-flat .dot-star { fill: var(--coffee-mid); stroke: var(--parchment-lit); }
-.pin.is-best.q-flat .star-glow { opacity: 0.10; }
-@keyframes star-breathe {
+@keyframes x-breathe {
   0%,100% { opacity: 0.10; transform: scale(0.94); }
-  50%     { opacity: 0.30; transform: scale(1.14); }
+  50%     { opacity: 0.26; transform: scale(1.12); }
 }
 
 /* --- the cartouche ------------------------------------------------------ */
