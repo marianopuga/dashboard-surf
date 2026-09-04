@@ -137,15 +137,12 @@
 .gnd-rhumb-main { stroke-width: 1; opacity: 0.24; }
 .gnd-ring { fill: none; stroke: var(--coffee); stroke-width: 1; opacity: 0.34; }
 
-/* Absolute over the whole document, NOT fixed to the viewport. They used to be
-   fixed while the sea orm in the colophon scrolled, which is the worst of both:
-   some creatures travelled with you and one stayed with its block. Everything
-   scrolls now, so a plate belongs to a place on the page rather than to a
-   corner of the screen.
-   `inset: 0` against a positioned <body> stretches this to the document's full
-   height, so `bottom` on a plate means the foot of the PAGE. */
+/* Fixed to the viewport — ALL of them, including the sea orm, which is why it
+   moved out of the colophon and into this layer. The mix was the problem: four
+   creatures held to the window while a fifth scrolled with its block read as an
+   inconsistency rather than as a choice. */
 .marginalia {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -192,7 +189,7 @@
    it does not depend on there being a margin at all. */
 .marg.marg-corner {
   top: auto;
-  bottom: 2%;
+  bottom: 0;
   width: clamp(130px, 29vw, 460px);
 }
 /* Both bottom plates bleed DOWN off the page as well as sideways. Sitting them
@@ -352,8 +349,7 @@ body::after {
      chart rather than disappearing behind one of them. */
   .marg-unicorn {
     left: 0;
-    /* A fifth of the way down the DOCUMENT now that the layer is not fixed. */
-    top: 20%;
+    top: 24%;
     aspect-ratio: 575 / 431;
     transform: rotate(-4deg);
   }
@@ -380,7 +376,6 @@ body::after {
    colour cannot.
    ========================================================================== */
 body {
-  position: relative;   /* the marginalia layer measures itself against this */
   margin: 0;
   background-color: var(--parchment);
   background-image:
@@ -1389,59 +1384,34 @@ a:hover { color: var(--coffee-deep); }
    the padding SHORTHAND, it appears later in this file (in the Responsive
    block), and at equal specificity that reset padding-bottom to 0. Every
    attempt to give the orm room silently did nothing because of it. */
-.colophon.wrap { padding-bottom: clamp(64px, 20vw, 240px); }
+.colophon.wrap { padding-bottom: var(--s8); }
 /* The one heading that sits on the bare ground rather than on a panel. */
 #sheet-heading { color: var(--ink-on-ground); }
 
-/* Gessner's sea orm, laid right across the colophon.
+/* Gessner's sea orm, across the bottom centre, between the two corner plates.
    
-   It is the one plate that scrolls with the page rather than sitting in the
-   fixed layer, because it belongs to this block: it is a 2.08:1 picture and
-   the footer band is the only wide, shallow space here. Anywhere in the side
-   gutters it would have had to be cropped to a column, which costs either the
-   coils or the ship, and the two together are the picture.
+   It sits in the fixed layer with the rest of them now rather than inside the
+   colophon. That is what the mix cost: held to its block it scrolled while the
+   other four stayed put.
    
-   It reads fainter than the plates either side of it because its source is a
-   soft woodcut — a quarter of it was mid-tone wash, which the ink filter turns
-   into fog. Fixed at the image rather than here: a 55% unsharp mask lifts its
-   contours 47% while keeping 70% of the wash. Raising opacity alone would have
-   darkened the fog as much as the lines, which is the thing that looks foggy.
+   Its sea is gone. The plate is a woodcut of a serpent in a hatched ocean, and
+   the hatching is what read as fog — it could not be removed by tone, because
+   the sea's strokes and the creature's outlines occupy exactly the same
+   luminance range. They separate on local ink DENSITY instead: the creature is
+   a dense mass of line, the sea is thin strokes with white between them, so
+   blurring the ink heavily and keeping only what sits in a dense neighbourhood
+   drops the water and leaves the animal. Ink below L110 went 20.2% -> 16.3%.
    
-   The opacity is still the lowest on the page and that figure is measured, not
-   chosen: the colophon's text sits over the top of the plate, and 0.34 is where
-   the darkest ink the filter can put under a letter still leaves 4.6:1. At 0.4
-   it is 4.2:1 and fails AA. */
-.colophon { position: relative; }
+   Darker than it was, at the cost the note below records. */
 .marg-orm {
-  position: absolute;
-  /* Just over half the column, centred. At full width it came out 1174px
-     across and 581 tall on a 1600px window — not a marginal any more but a
-     mural — and its rotated bounding box also spilled far enough to put the
-     page into horizontal scroll. Both go away at this size. */
   left: 50%;
-  /* Anchored to the FOOT of the colophon, not centred on it. Centring put the
-     creature behind the four columns of type, and positioning it by percentage
-     overhung the end of the page: the plate's height follows the column width
-     while the padding followed the viewport, so the two drifted apart and at
-     some widths it hung 100px past the last thing on the page. Pinned to the
-     bottom it cannot overhang at any width, whatever either of them does.
-     Its head and the ship still reach up behind the type, which is what ties
-     the picture to the block. */
-  /* `top: auto` is load-bearing: .marg sets `top: 8px` for the fixed corner
-     plates, and with a top, a bottom AND a height fixed by aspect-ratio the box
-     is over-constrained — the browser keeps `top` and drops `bottom`, which is
-     why pinning it to the foot appeared to do nothing and it still hung 123px
-     past the end of the page. */
   top: auto;
   bottom: 0;
-  width: min(560px, 56%);
+  width: min(560px, 44vw);
   aspect-ratio: 887 / 427;
-  z-index: -1;
-  opacity: 0.34;
-  transform: translateX(-50%) rotate(-1deg);
+  opacity: 0.46;
+  transform: translate(-50%, 16%) rotate(-1deg);
 }
-/* Below this the colophon collapses to a single narrow column and a 2.08:1
-   plate behind it is too small to read as a picture. */
 @media (max-width: 600px) { .marg-orm { display: none; } }
 
 .colophon dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s5); margin: 0; }
