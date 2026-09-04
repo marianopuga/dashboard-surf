@@ -991,24 +991,23 @@ a:hover { color: var(--coffee-deep); }
 .spot-id .kind { display: block; margin-top: 1px; }
 
 /* The per-spot incidence diagram, in the same visual language as the chart. */
-.dial { width: 50px; height: 44px; flex: none; }
-.dial .dial-bg   { fill: var(--paper-raised); }
-.dial .land-half { fill: var(--olive); opacity: 0.09; }
-.dial .sw-casing,
-.dial .wd-casing { stroke: var(--paper-raised); stroke-width: 3.5; fill: none;
-                   stroke-linecap: round; stroke-linejoin: round; }
-.dial .face     { stroke: var(--olive); stroke-width: 1.6; fill: none; stroke-linecap: round; }
-.dial .win      { fill: var(--coffee); opacity: 0.12; }
-.dial .sw-arrow { stroke: var(--coffee); stroke-width: 1.5; fill: none; stroke-linecap: round; }
-.dial .sw-head  { fill: var(--coffee); }
-.dial .wd-arrow { stroke: var(--olive); stroke-width: 1.1; fill: none; stroke-dasharray: 2.5 1.8; stroke-linecap: round; }
-.dial .wd-head  { stroke: var(--olive); stroke-width: 1.3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* The row's wave glyph — the same mark as the chart's swell field, at 44px.
+   Amplitude follows the height arriving at that beach, so the column can be
+   read for size without reading a number. */
+/* No backing plate: the old dial needed one so its arrow casings had a known
+   colour to knock out against, and left behind it showed as a pale box on the
+   selected row, whose background is tinted. */
+.wave-glyph { width: 50px; height: 44px; flex: none; }
+.wg-crest {
+  fill: none;
+  stroke: var(--coffee);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
-/* Swell outside this beach's window: drain the ink out of the arrow so a
-   shadowed spot reads as shadowed without a second colour. */
-.dial.is-shadowed .sw-arrow { stroke: var(--antique); }
-.dial.is-shadowed .sw-head  { fill: var(--antique); }
-.dial.is-shadowed .win      { opacity: 0.06; }
+/* Swell that cannot reach this beach: drain the ink out, so a shadowed spot
+   reads as shadowed without introducing a second colour. */
+.wave-glyph.is-shadowed .wg-crest { stroke: var(--antique); opacity: 0.28; }
 
 .readout { font-size: var(--t-small); min-width: 0; }
 .readout .v { color: var(--ink-body); font-weight: 500; display: block; }

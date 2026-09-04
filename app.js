@@ -341,43 +341,84 @@ function crestField(from) {
 // The fleet. Only size and posture are fixed here — a ship's position and its
 // course are decided per voyage, at run time (see sailFleet).
 //
-// `rot` and `flip` exist to break up the formation: three copies of one plate
-// at one angle read as clip-art rather than as ships that happen to be out
-// there. `roll` and `heave` are deliberately not multiples of each other — two
-// motions on periods that do not divide evenly never come back into the same
+// `rot` breaks up the formation a little, so three copies of one plate do not
+// read as clip-art. Two rules it has to obey, both learned the hard way:
+//
+//   No mirroring. One hull used to be drawn scale(-1 1) for variety, and it was
+//   the one that looked wrong on the chart. Mirroring an engraving reverses its
+//   hatching and its light, so the plate stops agreeing with itself and reads
+//   as a wrong-handed twin of the other two rather than as another ship.
+//
+//   All heel the same way. Ships on one course in one wind lean together; two
+//   leaning left and one right reads as a mistake, not as variety. The angles
+//   are smaller now too — 8 degrees was a list, not a heel.
+//
+// `roll` and `heave` are deliberately not multiples of each other: two motions
+// on periods that do not divide evenly never come back into the same
 // relationship, so the combined movement does not repeat, which is what stops
 // it reading as a mechanism.
 const FLEET = [
-  // The sea lane is only ~90 units across, so no hull can be much wider than
-  // this without filling it and leaving no water either side.
-  { w: 66, rot: -4, flip: false, roll: 11,  heave: 7.3 },
-  { w: 52, rot: 6,  flip: true,  roll: 8.5, heave: 5.9 },
-  { w: 43, rot: -8, flip: false, roll: 7,   heave: 4.7 },
+  { w: 66, rot: -3, roll: 11,  heave: 7.3 },
+  { w: 52, rot: -5, roll: 8.5, heave: 5.9 },
+  { w: 43, rot: -4, roll: 7,   heave: 4.7 },
 ];
 
-// The water a ship may sail in. `x` is east of the shoreline's furthest point
-// (x≈193, at Long Reef); `y` runs from below the chart to above it, so a ship
-// makes the whole length of the coast — enters at the bottom of the plate,
-// works all the way north, and thins out at the top.
-//
-// It used to be cut into bands a fifth of that long, which is what made the
-// movement wrong: a hull appeared, crept 143 of the chart's 667 units, and
-// vanished having got nowhere. Bands were there to stop two ships colliding in
-// a lane too narrow to pass in; that job now belongs to spacing them in time
-// (see DEPART_GAP), which is how ships on one course actually stay apart.
-const SEA_LANE = { x0: 214, x1: 302, y0: -10, y1: 715 };
+// The stretch of coast a ship works, bottom to top. It starts just north of
+// the cartouche rather than off the bottom of the plate: the cartouche is
+// opaque and drawn last, and there is nowhere to pass it — east of it is off
+// the chart, and west of it the sea between shore and box is only ~49 units,
+// narrower than the largest hull. Ships used to be held invisible until they
+// were clear of it, which wasted a third of every passage.
+// The northern end is not the top edge of the plate. The Long Reef headland
+// juts east to x=245 around y=25-40, leaving a corridor of 312-245 = 67 units
+// where the widest hull needs 66 plus its clearance — it simply does not fit,
+// and a ship pushed as far east as the plate allows still had its beam 1 unit
+// off the sand. So a ship is gone before it gets there. Measured against the
+// shore profile: below y=45 the coast falls back to x=196 and the corridor
+// opens to 116.
+const LANE_Y0 = 95;     // faded out south of the headland pinch
+const LANE_Y1 = 480;    // in view, keel clear of the cartouche at y=537
 
-// Every ship makes way at very nearly the same speed, in chart units per
-// second. This is what keeps a convoy in one lane safe: give hulls independent
-// durations and a fast one eventually overtakes a slow one from behind. The
-// spread is small enough that over a whole passage the quickest closes only
-// ~70 units on the slowest, against a departure gap worth several hundred.
-const SHIP_SPEED = 4.2;
-const SHIP_SPEED_SPREAD = 0.08;
-// Seconds between one departure and the next being allowed. At SHIP_SPEED this
-// is 250–400 units of clear water between consecutive hulls, against a tallest
-// hull of 66 * 1.246 = 82.
-const DEPART_GAP = [60, 95];
+// Clear water a ship keeps between its own beam and the beach. The track is
+// built outward from this, so it is a real clearance rather than a distance to
+// the hull's centre — the largest hull is 66 wide, and offsetting its *centre*
+// by this much would put a third of it on the sand.
+const OFFSHORE = [38, 58];
+
+const SHIP_SPEED = 3.0;   // chart units per second (~128s a lap)
+
+/**
+ * The course a ship holds: the shoreline, pushed `off` units further out than
+ * its own beam. Following the coast is what keeps hulls off the land — it
+ * swings between x=61 at Manly and x=196 at Long Reef, so any straight column
+ * wide enough to clear the headlands runs aground somewhere else.
+ *
+ * The shore is sampled as a MAXIMUM over the stretch each leg spans, not as a
+ * point reading. A polyline only touches the coast at its vertices and cuts
+ * the corner in between, so with point samples a headland peaking mid-leg is
+ * simply missed — which is exactly what beached them: 11 of 200 swept
+ * positions had a hull 22 units inland off the Long Reef and Dee Why points.
+ */
+function shipTrack(off, beam, halfH) {
+  const pts = [];
+  const N = 40;
+  const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
+  // The window has to cover the hull's own height, not just the leg. A ship is
+  // 82 units tall and only its midpoint sits on the track, so a headland level
+  // with its bow is one the centre line never sees — that left 171 of 1200
+  // swept positions with some part of a hull up to 48 units inland.
+  const reach = halfH + span;
+  for (let i = 0; i <= N; i++) {
+    const y = LANE_Y1 + (LANE_Y0 - LANE_Y1) * (i / N);
+    let shore = -Infinity;
+    for (let d = -reach; d <= reach; d += reach / 8) {
+      shore = Math.max(shore, SHORE_X(clamp(y + d, 0, COAST.H)));
+    }
+    // Never off the eastern edge of the plate, however far out the coast pushes.
+    pts.push({ x: Math.min(shore + beam + off, COAST.W - 8 - beam), y });
+  }
+  return pts;
+}
 
 /** The fleet's DOM, kept across re-renders so voyages are never restarted. */
 let FLEET_NODE = null;
@@ -428,125 +469,61 @@ function tideGauge(cond, x, h) {
 }
 
 /**
- * Send the fleet sailing.
+ * Send the fleet sailing: each ship works north along the coast, thins out at
+ * the top, and comes back up from the bottom to do it again.
  *
- * Each ship gets its own voyage — a start, a finish, and a duration — fades in
- * as it comes over the horizon, crosses, and fades out; then a *new* voyage is
- * chosen and it comes back somewhere else. The randomness is real rather than
- * a long looping animation, which is the difference between "the sea has ships
- * on it" and "three sprites are on a timer".
+ * One animation per ship, running forever, rather than a fresh voyage
+ * scheduled each time one ends. That is what makes it safe as well as simple.
+ * The three share one sea lane and no hull can pass another in it, so they have
+ * to stay strung out — and with `iterations: Infinity` plus a different
+ * `iterationStart` each, the spacing is fixed by construction and cannot drift.
+ * Every earlier version rescheduled voyages and so had to defend that spacing
+ * at run time: first with bands (which cut each passage to a fifth of the
+ * coast), then with departure gating and a near-common speed (which only
+ * bounded the drift rather than removing it).
  *
- * Done through the Web Animations API rather than CSS keyframes because the
- * numbers change every voyage: CSS would need its keyframes rewritten each
- * time, whereas here the next voyage is just the next call. The gap before a
- * ship reappears is part of it — an empty sea that fills again reads as
- * distance, where three permanently-present ships read as decoration.
- *
- * Every animation is a transform/opacity pair, so this stays on the compositor
- * and costs nothing per frame regardless of how much else is repainting.
+ * It also means nothing accumulates. Element.animate() *adds* an animation, so
+ * a new one per voyage left every finished one filling forever.
  */
 function sailFleet(svg) {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    // Still put them on the water — just becalmed, at a fixed spread.
-    svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
-      // Spread over the same lane the voyages use, evenly, so becalmed ships
-      // are as far apart as sailing ones ever get.
-      const y = SEA_LANE.y0 + ((i + 1) / (FLEET.length + 1)) * (SEA_LANE.y1 - SEA_LANE.y0);
-      g.setAttribute("transform", `translate(${(SEA_LANE.x0 + SEA_LANE.x1) / 2},${y.toFixed(1)})`);
-    });
-    return;
-  }
-
   const rand = (lo, hi) => lo + Math.random() * (hi - lo);
-
-  // One shared lane, so ships are kept apart in TIME rather than in space: a
-  // departure is only allowed once enough of it has passed since the last one.
-  // This is how a line of ships on one course actually stays clear, and unlike
-  // the old bands it costs a ship nothing — each one still makes the entire
-  // length of the coast.
-  let lastDeparture = -Infinity;
-
-  const RUN = SEA_LANE.y1 - SEA_LANE.y0;
+  const RUN = LANE_Y1 - LANE_Y0;
+  // One duration for all of them. Different speeds in a lane nobody can
+  // overtake in means a fast ship eventually closes on a slow one; identical
+  // speeds hold the formation exactly.
+  const dur = (RUN / SHIP_SPEED) * 1000;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
-    const beam = FLEET[i].w * 0.5;   // keep the hull off the lane's edges
-    const lane = () => rand(SEA_LANE.x0 + beam, SEA_LANE.x1 - beam);
-    let seeded = false;
-    let current = null;
+    const beam = FLEET[i].w * 0.5;
+    const track = shipTrack(rand(...OFFSHORE), beam, FLEET[i].w * SHIP_ASPECT * 0.5);
 
-    // Where this ship is along its first passage, so the three are strung out
-    // up the coast on the very first frame instead of abreast. All three sit
-    // inside the visible stretch (0.32 to 1.0) — seeding one at 0.1 put it
-    // south of the cartouche, where it is deliberately still invisible, and
-    // the page opened with two ships instead of three.
-    const SEED_AT = [0.84, 0.62, 0.4][i];
+    if (reduced) {
+      // Becalmed, but still strung out along the coast rather than stacked.
+      const p = track[Math.round((0.25 + i * 0.25) * (track.length - 1))];
+      g.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
+      g.style.opacity = 1;
+      return;
+    }
 
-    const voyage = () => {
-      const now = performance.now();
-      // The gap gate does not apply to the opening voyage: those are already
-      // part-way along, so they were "dispatched" at staggered times in the
-      // past, and making them queue would leave the sea empty for a minute.
-      if (seeded) {
-        const wait = lastDeparture + rand(...DEPART_GAP) * 1000 - now;
-        if (wait > 0) return void setTimeout(voyage, wait);
-      }
+    const frames = track.map((p, k) => {
+      const t = k / (track.length - 1);
+      // Up quickly at the bottom, down over the last stretch, so a ship fades
+      // in low on the chart and thins into the distance at the top rather than
+      // switching off at an edge.
+      const opacity = t < 0.06 ? t / 0.06 : t > 0.86 ? (1 - t) / 0.14 : 1;
+      return { offset: t, transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`, opacity };
+    });
 
-      // North, always. Alternating the direction at random was what made the
-      // movement read wrong: with several hulls on screen one would slide up
-      // while another slid down, which no fleet does.
-      //
-      // One track, not two independent draws — picking the start and finish x
-      // separately let a ship crab sideways across the lane as it went. A
-      // couple of units of wander is a course held in a seaway.
-      const trackX = lane();
-      const driftX = trackX + rand(-5, 5);
-      const speed = SHIP_SPEED * rand(1 - SHIP_SPEED_SPREAD, 1 + SHIP_SPEED_SPREAD);
-      const dur = (RUN / speed) * 1000;
-
-      // Element.animate() *adds* an animation; the previous one keeps filling
-      // forever otherwise, so they accumulate one per voyage for as long as the
-      // page is open. Retire it explicitly.
-      if (current) current.cancel();
-      const anim = g.animate(
-        [
-          { transform: `translate(${trackX.toFixed(1)}px,${SEA_LANE.y1}px)`, opacity: 0 },
-          // Held invisible until the hull is north of the cartouche. The lane
-          // is 214–302 and the cartouche spans 192–310, so a ship coming up
-          // from the bottom passes clean behind it — and since the cartouche is
-          // opaque and drawn last, what showed was a set of mastheads sticking
-          // out above the box with no ship under them. Nothing can be moved
-          // aside to fix that (the cartouche is wider than the whole lane), so
-          // the ship simply comes into view once it is past.
-          // 0.32 puts the largest hull's keel at y=524 against the
-          // cartouche's top edge at 537 — measured, not guessed: at 0.20 the
-          // ship was still half in the box while fading up.
-          { opacity: 0, offset: 0.32 },
-          { opacity: 1, offset: 0.4 },
-          { opacity: 1, offset: 0.78 },
-          // Thins out into the distance over the top fifth of the chart rather
-          // than switching off. The fade has to finish while the ship is still
-          // ON the plate — run it past the top edge and the ship simply slides
-          // out of the viewBox at full strength, which is a clip, not a
-          // disappearance.
-          { transform: `translate(${driftX.toFixed(1)}px,${SEA_LANE.y0}px)`, opacity: 0 },
-        ],
-        { duration: dur, easing: "linear", fill: "forwards" }
-      );
-      current = anim;
-      if (!seeded) {
-        seeded = true;
-        anim.currentTime = dur * SEED_AT;
-        // Backdate the departure to when this ship would actually have sailed,
-        // so the first scheduled departure after the openers still lands a full
-        // gap behind the most recent of them.
-        lastDeparture = Math.max(lastDeparture, now - dur * SEED_AT);
-      } else {
-        lastDeparture = now;
-      }
-      anim.onfinish = () => setTimeout(voyage, rand(2000, 12000));
-    };
-
-    voyage();
+    g.animate(frames, {
+      duration: dur,
+      easing: "linear",
+      iterations: Infinity,
+      // Evenly spaced around the loop, so the three are strung out up the coast
+      // at every moment including the first frame: a third of a run apart is
+      // ~163 units, against a tallest hull of 82.
+      iterationStart: i / FLEET.length,
+    });
   });
 }
 
@@ -724,7 +701,7 @@ function renderChart(rows, cond, activeId) {
                fill="url(#ship-clearing)"/>
       <g class="ship-heave" style="--dur:${s.heave}s">
         <g class="ship-roll" style="--dur:${s.roll}s">
-          <g transform="rotate(${s.rot})${s.flip ? " scale(-1 1)" : ""}">
+          <g transform="rotate(${s.rot})">
             ${CHROME.plate("assets/ship-cutout.png", 0, 0, s.w, "ship", SHIP_ASPECT)}
           </g>
         </g>
@@ -827,51 +804,55 @@ function renderLegend() {
 }
 
 // ===========================================================================
-// The per-spot dial — the same visual language as the chart, at 44px
+// The per-spot wave glyph
 // ===========================================================================
 
 /**
- * The row dial, drawn in the *beach's own* reference frame rather than in
- * absolute compass orientation: the shore is always the vertical line, land is
- * always the tinted half on the left, open ocean is always on the right.
+ * The mark in each spot row: swell, drawn as swell.
  *
- * That normalisation is the whole point. Eleven dials each rotated to its own
- * true compass heading are eleven puzzles; normalised, they are directly
- * comparable, and the two readings you actually care about become positional:
- *   · a swell arrow entering horizontally  = straight in;  steeply = side-shore
- *   · a wind arrow starting on the LEFT    = offshore (blowing out to sea)
- *     a wind arrow starting on the RIGHT   = onshore  (blowing the surf apart)
- * You read good-or-bad off which side the dashed arrow comes from, at a glance,
- * with no degrees involved.
+ * This replaced a dial that showed the swell and wind bearings normalised into
+ * the beach's own frame. That dial was more informative but it read as a
+ * diagram — two arrows and a shaded wedge in a box — and sat oddly on a page
+ * that is otherwise a chart. The directions are not lost: they are on the map
+ * whenever a spot is selected, and spelled out in words in the row beside this.
+ *
+ * It is deliberately the same mark as the swell field on the chart itself:
+ * stacked crest lines, staggered in phase, in three weights. What it adds is
+ * scale — the amplitude and the spacing follow the height actually arriving at
+ * THIS beach, so a big day and a flat one are told apart across the column
+ * without reading a number, and the ink drains out entirely where the swell
+ * cannot reach the spot at all.
  */
-function dial(spot, swellFrom, windFrom) {
-  const CX = 25, CY = 22, R = 19;
-  const read = readSwell(spot, swellFrom);
+function waveGlyph(spot, score) {
+  const W = 50, H = 44;
+  const hs = score?.hsAtSpot;
+  const reaches = score && score.sizeClass !== "flat";
 
-  // Relative bearing -> screen angle. vec(θ + 90) points along (cos θ, sin θ),
-  // i.e. θ = 0 is straight offshore and lands on the right of the dial.
-  const rel = (b) => (((b - spot.facing_deg) % 360) + 540) % 360 - 180;
-  const at = (theta, r) => {
-    const v = vec(theta + 90);
-    return { x: CX + v.x * r, y: CY + v.y * r };
+  // Amplitude carries the size. Clamped hard at both ends: flat still has to
+  // draw a line (an empty box reads as a rendering failure, not as no surf)
+  // and a huge day must not spill out of a 44px box.
+  const amp = clamp(1.1 + (hs ?? 0) * 2.6, 1.1, 6.2);
+  const rows = [
+    { y: 13, w: 0.9, o: 0.22, ph: 0 },
+    { y: 23, w: 1.7, o: 0.46, ph: 2.3 },
+    { y: 33, w: 1.2, o: 0.30, ph: 4.4 },
+  ];
+
+  const line = ({ y, ph }, a) => {
+    let d = "";
+    for (let x = 3; x <= W - 3; x += 2.2) {
+      const yy = y + a * Math.sin((x / (W - 6)) * Math.PI * 2.6 + ph);
+      d += `${d ? "L" : "M"}${x.toFixed(1)} ${yy.toFixed(1)}`;
+    }
+    return d;
   };
 
-  // An opaque plate of its own, so the arrow casings always have a known colour
-  // to knock out against no matter what the row behind is doing.
-  let g = `<rect class="dial-bg" x="0" y="1" width="50" height="${CY * 2 - 2}"/>`;
-  g += `<rect class="land-half" x="0" y="1" width="${CX}" height="${CY * 2 - 2}"/>`;
-  g += wedge(CX, CY, R, rel(spot.swell_window[0]) + 90, rel(spot.swell_window[1]) + 90, "win");
-  g += `<line class="face" x1="${CX}" y1="2.5" x2="${CX}" y2="${CY * 2 - 2.5}"/>`;
+  // The middle crest carries the size; the two outriders stay shallower, the
+  // same 3-weight cycle the chart's own swell field uses.
+  const g = rows.map((r) => `<path class="wg-crest" stroke-width="${r.w}"
+      opacity="${r.o}" d="${line(r, amp * (r.w > 1.5 ? 1 : 0.6))}"/>`).join("");
 
-  if (swellFrom != null) {
-    const a = at(rel(swellFrom), R), b = at(rel(swellFrom), 6);
-    g += arrowTo(a.x, a.y, b.x, b.y, "sw", true, true);
-  }
-  if (windFrom != null) {
-    const a = at(rel(windFrom), R), b = at(rel(windFrom), 7);
-    g += arrowTo(a.x, a.y, b.x, b.y, "wd", false, true);
-  }
-  return `<svg class="dial ${read.lit ? "" : "is-shadowed"}" viewBox="0 0 50 44"
+  return `<svg class="wave-glyph ${reaches ? "" : "is-shadowed"}" viewBox="0 0 ${W} ${H}"
     aria-hidden="true">${g}</svg>`;
 }
 
@@ -1129,7 +1110,7 @@ function renderSheet(rows, cond, slots, tideModel) {
     return `<li class="spot" id="spot-${spot.id}" data-spot="${spot.id}">
       <button class="spot-row" type="button" aria-expanded="false">
         <span class="spot-id">
-          ${dial(spot, cond.swellFromDeg, cond.windFromDeg)}
+          ${waveGlyph(spot, score)}
           <span>
             <h3>${spot.name}</h3>
             <span class="kind label">${spot.kind === "reef" ? "Reef" : "Beach"}</span>
@@ -1276,8 +1257,8 @@ function updateSheetForTime(rows, cond) {
     const sw = readSwell(spot, cond.swellFromDeg);
     const wd = readWind(spot, cond.windFromDeg, cond.windKmh);
 
-    const dialEl = li.querySelector(".dial");
-    if (dialEl) dialEl.outerHTML = dial(spot, cond.swellFromDeg, cond.windFromDeg);
+    const glyph = li.querySelector(".wave-glyph");
+    if (glyph) glyph.outerHTML = waveGlyph(spot, score);
 
     const rs = li.querySelector(".readout-swell");
     if (rs) rs.innerHTML = `<span class="v">${sw.text}</span>
