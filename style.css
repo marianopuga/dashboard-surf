@@ -195,7 +195,7 @@
 .marg-dragon {
   right: 0;
   aspect-ratio: 800 / 769;
-  transform: translate(24%, 22%) rotate(5deg) scaleX(-1);
+  transform: translate(24%, 12%) rotate(5deg) scaleX(-1);
 }
 /* Anchored so the galleon at the top of the plate lines up with the left edge
    of the content column. The hull begins 38.3% across the image — measured off
@@ -209,19 +209,24 @@
    a band of bare parchment opens up to its left, which is what happened when
    the alignment was first added at a fixed width.
 
-   The `min(0px, ...)` is the graceful failure. Past the cap the equation would
-   start pushing the plate rightwards again, so instead it pins flush to the
-   window and the alignment drifts — a small misalignment reads as nothing, an
-   empty strip down the edge reads as a mistake. */
+   There is deliberately NO upper cap on that width. Capping it was tried and
+   it does not work: past the cap the plate is too narrow to reach the window
+   edge once its galleon is on the column edge, so you get back either the empty
+   strip or a misaligned ship — the two are the same constraint and you cannot
+   satisfy one by giving up the other. On a very wide window the plate does get
+   large, but most of it lies under the content column where nothing shows it,
+   and what fills the margin is the middle of the creature rather than its edge.
+
+   `min(0px, ...)` only guards the narrow end, where the gutter goes to zero. */
 .marg-kraken {
   left: 0;
-  width: clamp(260px, calc((100vw - 1180px) / 0.766 + 24px), 900px);
+  width: max(260px, calc((100vw - 1180px) / 0.766 + 20px));
   aspect-ratio: 405 / 390;
   transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 20%) rotate(3deg);
 }
 
 @media (min-width: 1400px) {
-  .marg-dragon { transform: translate(12%, 16%) rotate(5deg) scaleX(-1); }
+  .marg-dragon { transform: translate(12%, 7%) rotate(5deg) scaleX(-1); }
   .marg-kraken { transform: translate(min(0px, calc((100vw - 1180px) / 2 - 38.3%)), 15%) rotate(3deg); }
 }
 
