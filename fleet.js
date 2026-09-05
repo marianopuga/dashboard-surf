@@ -34,7 +34,7 @@ const NAVY = (() => {
       // waiting to sail. Each one is a filtered raster image, which is the
       // most expensive thing the chart draws, so this is the number to lower
       // first if the page ever feels heavy.
-      count: 5,
+      count: 6,
 
       // Chart units per second. The spread is what breaks the old lockstep —
       // the previous fleet shared ONE duration, which is why it read as a
@@ -67,8 +67,11 @@ const NAVY = (() => {
       // nothing to read the others' wandering against.
       orderlyEveryN: 8,
 
-      // Seconds between one departure and the next.
-      departGap: [24, 68],
+      // Seconds between one departure and the next. Shorter means more hulls
+      // at sea at once, which is what actually drives how often anything
+      // happens: engagements need PAIRS, and pairs grow with the square of how
+      // many are out there.
+      departGap: [12, 30],
 
       // Seconds a hull waits before sailing again after finishing a passage.
       respawnDelay: [5, 22],
@@ -90,7 +93,7 @@ const NAVY = (() => {
     combat: {
       // Two ships closer than this may engage. Comfortably larger than
       // minSeparation, so an engagement is a near pass rather than a collision.
-      engageDistance: 135,
+      engageDistance: 165,
 
       // The floor. Courses that would bring two hulls closer than this are
       // rejected at spawn and re-drawn.
@@ -102,12 +105,14 @@ const NAVY = (() => {
       minSeparation: 82,
 
       // Not every near pass is a fight — otherwise proximity becomes a rule
-      // the eye learns in a minute.
-      engageChance: 0.55,
+      // the eye learns in a minute. This is the single number to turn if you
+      // want more or less gunnery: at 0.85 most near passes end in an
+      // exchange, at 0.3 it is an occasional event you catch by luck.
+      engageChance: 0.85,
 
       // Hard ceiling on concurrent exchanges, so a busy sea cannot pile up
       // animations. The performance budget is a constraint, not an aspiration.
-      maxSimultaneous: 2,
+      maxSimultaneous: 3,
 
       // The longest a ship will wait for a clear slot before sailing anyway.
       maxHold: 96,
