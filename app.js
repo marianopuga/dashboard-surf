@@ -767,8 +767,14 @@ function renderChart(rows, cond, activeId) {
     </defs>
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
-      ${COAST.contours.map((d) => `<path class="depth" d="${d}"/>`).join("")}
-      <!-- The rhumb lines used to fan across the water from here. Taken out:
+      <!-- No depth contours either. They were the faint dashed curves running
+           parallel to the shore, and they went for the same reason as the
+           rhumb lines: the sea is already carrying drawn swell, and a second
+           family of lines following the coast under it reads as ruling rather
+           than as water. The soundings they stood for are not data this page
+           shows anywhere else, so nothing is lost but the clutter.
+
+           The rhumb lines used to fan across the water from here. Taken out:
            the sea already carries its own drawn crests, and a second family of
            straight lines over the top of them read as ruling rather than as
            water. They still fan across the PAGE behind everything, which is

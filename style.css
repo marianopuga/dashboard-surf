@@ -723,7 +723,6 @@ a:hover { color: var(--coffee-deep); }
 .shore { fill: none; stroke: var(--olive); stroke-width: 1.25; stroke-linejoin: round; }
 .rock  { fill: var(--paper-sunken); stroke: var(--olive); stroke-width: 0.75; }
 
-.depth { fill: none; stroke: var(--antique); stroke-width: 0.6; opacity: 0.3; stroke-dasharray: 6 4; }
 
 /* Swell: solid, filled head, Coffee — the primary signal. */
 /* Three weights on a repeating cycle. Uniform lines translating by exactly one
@@ -797,7 +796,7 @@ a:hover { color: var(--coffee-deep); }
 .window-wedge { fill: var(--coffee); opacity: 0.13; }
 /* The two edges of the beach's swell window, and the shore-normal it is read
    against, are the only construction lines on the chart — they say what the
-   arrow beside them means. At 0.45 they were fainter than the depth contours
+   arrow beside them means. At 0.45 they were fainter than the sea's own lines
    behind them, which put the explanation below the decoration. */
 .window-edge  { stroke: var(--coffee); stroke-width: 1; opacity: 0.72; fill: none; stroke-dasharray: 3 2.5; }
 
@@ -918,7 +917,6 @@ a:hover { color: var(--coffee-deep); }
     transform-origin: 0 0;
     will-change: transform;
   }
-  .depth { animation: water-shimmer 18s linear infinite; }
 
   /* The hull answering the sea under it, kept in two separate groups so
      neither motion has to know about the other: a roll and a heave, on periods
@@ -941,7 +939,6 @@ a:hover { color: var(--coffee-deep); }
   }
 }
 @keyframes swell-march { to { transform: translate(var(--tx, 0), var(--ty, 0)); } }
-@keyframes water-shimmer { to { stroke-dashoffset: -40; } }
 /* Shallow, and unevenly spaced. A hull seen from this far off barely leans —
    the previous 1.7deg swung the mastheads far enough to read as a toy — and
    the uneven keyframe offsets keep even this one motion off a clean sine. */

@@ -34,7 +34,16 @@ const NAVY = (() => {
       // waiting to sail. Each one is a filtered raster image, which is the
       // most expensive thing the chart draws, so this is the number to lower
       // first if the page ever feels heavy.
-      count: 6,
+      //
+      // Eight rather than six, and the reason is tactical rather than
+      // decorative. Ganging up needs three ships within range of each other at
+      // the same time, and shortening the engagement range to make the gunnery
+      // accurate made that rare: measured, not one moment in ninety seconds had
+      // two guns on the same target. Accuracy wants a short range and piling on
+      // wants company, and the way to have both is more ships, not a wider
+      // range. The lane is about six hundred units long and the clearance floor
+      // needs roughly sixty per hull, so it holds nine — eight fits with room.
+      count: 8,
 
       // Chart units per second. The spread is what breaks the old lockstep —
       // the previous fleet shared ONE duration, which is why it read as a
@@ -78,11 +87,11 @@ const NAVY = (() => {
       // ship sails at once. The gap still governs a healthy sea; it just stops
       // being allowed to starve one.
       //
-      // Four of six. Three was the first setting and it held the chart at
+      // Five of eight. Three was the first setting and it held the chart at
       // exactly three, because the floor is also where the sea settles: every
       // loss is replaced immediately and nothing else is, so whatever number
       // goes here is roughly what you will see.
-      minAtSea: 4,
+      minAtSea: 5,
 
       orderlyEveryN: 8,
 
@@ -118,10 +127,17 @@ const NAVY = (() => {
       // fight. At 120 they had to be practically rubbing gunwales, and a fight
       // you only get when two hulls nearly touch is a fight you rarely get.
       //
-      // 170 is roughly three or four hull-widths: near enough that the two are
-      // plainly each other's business, far enough that they open fire on the
-      // approach instead of only at the pass.
-      engageDistance: 170,
+      // 145 is roughly three hull-widths: near enough that the two are plainly
+      // each other's business, far enough that they open fire on the approach
+      // instead of only at the pass.
+      //
+      // It came down from 170 for a measured reason. This number does not just
+      // gate the shooting, it sets the SHAPE of the engagement: two ships close
+      // along a lane, so most of the time they spend inside it is spent near
+      // its outer edge. At 170 the median shot was taken at 135 units, where a
+      // gun hits four times in ten, and the sea's hit rate was 36% however
+      // accurate each gunner was on paper.
+      engageDistance: 145,
 
       // HOW CLOSE TWO HULLS MAY COME — as a multiple of their own size, not in
       // chart units.
@@ -148,7 +164,22 @@ const NAVY = (() => {
       // Not every near pass is a fight — otherwise proximity becomes a rule the
       // eye learns in a minute, and a ship that always fires when it can is a
       // machine rather than a crew.
-      engageChance: 0.75,
+      engageChance: 0.8,
+
+      // GUNNERS HOLD FIRE AT LONG RANGE.
+      //
+      // Accuracy was set per shot and it was right per shot — 82% at fifty
+      // units, 34% at a hundred and seventy — and the rate actually observed on
+      // the water was 20%, because volleys were scheduled evenly across the
+      // whole time two ships were in range and most of that time is spent far
+      // apart. The gunners were technically fine and tactically idiots.
+      //
+      // A volley's chance of being taken now falls with the square of the
+      // range: at nothing it is the full engageChance, at the edge of the
+      // engagement distance it is (1 - holdFire) of it. Nobody is made more
+      // accurate. They just stop wasting powder at the far end of the window,
+      // which is what raises the hits you actually see.
+      holdFire: 0.88,
 
       // Seconds between volleys while two ships remain within range of each
       // other, and the first number to turn if the sea needs to get louder or
@@ -162,14 +193,72 @@ const NAVY = (() => {
       // two knobs multiply.
       reengageEvery: [10, 18],
 
+      // HOW A CREW PICKS A FIGHT.
+      //
+      // Weights on the score in `consider`. They are not thresholds and no one
+      // of them decides anything on its own; the behaviour is what falls out of
+      // them together. Raise `wounded` and `piling` and the fleet turns into a
+      // pack that finishes anything it hurts; raise `rangeBias` and everyone
+      // becomes a local bully who only fights whoever is nearest.
+      tactics: {
+        // A hull already hurt is worth finishing. This is the term that makes
+        // ships gang up, and it compounds: the first hit makes her the best
+        // target, which makes the second hit likelier.
+        //
+        // Raised once the reload timer went in. The reload governs how MUCH
+        // gunnery there is, and it damped the piling-on along with the runaway
+        // it was there to stop. These two weights do not add a single shot —
+        // they decide who the shots that are happening anyway get aimed at, so
+        // turning them up concentrates the fire without making the sea busier.
+        wounded: 2.4,
+        // ...and so does the sight of someone else already firing on her.
+        piling: 1.4,
+        // She is busy with somebody else, which is the third ship's opening.
+        distracted: 0.7,
+        // She is shooting at ME.
+        underFire: 1.1,
+        // How much distance puts a captain off a target, at the far edge of
+        // the engagement range.
+        rangeBias: 0.55,
+
+        // How long a ship counts as "currently firing on" someone, in ms.
+        // Without this the mark never expires and the whole tactical picture
+        // is a record of who once shot at whom, which scores exactly as badly
+        // as it sounds.
+        memory: 14000,
+
+        // BLOOD IN THE WATER.
+        //
+        // A hit is news. Everyone else in range of the ship that took it looks
+        // round within this many ms, which is what actually produces the
+        // ganging up — the scoring already prefers a wounded target, but with
+        // decisions arriving only every ten to eighteen seconds nobody was
+        // looking at the moment there was something to see. Measured before
+        // this existed: a ship sat at three hits of four with not one gun
+        // trained on her.
+        alarm: [400, 2200],
+      },
+
+      // Seconds a ship needs before she can fire again.
+      //
+      // Guns are reloaded, which is reason enough — but it is also the damper
+      // on a feedback loop the tactics create and would otherwise run away
+      // with. A hit makes everyone in range look round; looking round makes
+      // them fire; firing makes hits. Measured without this: 86 shots and
+      // three ships sunk in forty-two seconds, a sea that never stopped for
+      // breath. The loop is what produces the ganging up, so it is damped
+      // rather than removed.
+      reload: [7, 13],
+
       // Hard ceiling on concurrent exchanges, so a busy sea cannot pile up
       // animations. The performance budget is a constraint, not an aspiration.
       // Each exchange is two <circle> nodes living about a second and a half,
       // so this is cheap next to a single hull.
-      // Two, not five. This is a ceiling on animation cost, but it turns out
-      // to be a ceiling on the casualty rate too: five concurrent exchanges
-      // across a six-ship fleet meant nearly everyone was under fire at once.
-      maxSimultaneous: 2,
+      // A ceiling on animation cost, and on the casualty rate with it. Three
+      // rather than two because a broadside is now one-sided: what used to be
+      // one two-way exchange is two of these, and a fight between three ships
+      // needs room to be three-sided.
+      maxSimultaneous: 3,
 
       // The two ships do not fire together; one is always a beat late.
       volleyStagger: [220, 950],
@@ -191,11 +280,24 @@ const NAVY = (() => {
       // point and the hull — asked, not decided in advance.
       //
       // Set from the two ends that matter. A hull is about a 17x10 target, so
-      // the numbers below put roughly two shots in three on her at fifty units
-      // and about one in four at the edge of the engagement range, which is
+      // the numbers below put roughly seven shots in ten on her at fifty units
+      // and about one in three at the edge of the engagement range, which is
       // what "closer should be deadlier" means in figures rather than in
-      // spirit.
-      aimError: { base: 4, perUnit: 0.08 },
+      // spirit. Widened a notch from 0.062 — the fleet was landing a shade over
+      // four in ten across the sea, and a gunner who is right that often stops
+      // being worth watching.
+      aimError: { base: 3.5, perUnit: 0.072 },
+
+      // A BROADSIDE IS SEVERAL GUNS.
+      //
+      // One ball per ship per exchange was the wrong picture of the thing, and
+      // it was also the reason the gunnery felt thin: the only way to land more
+      // shots was to make each one improbably accurate. Firing a ragged row of
+      // them instead raises the hits without turning every gunner into a
+      // marksman, and it looks like what it is. Each ball is aimed and thrown
+      // off on its own, so a broadside spreads.
+      ballsPerVolley: [2, 3],
+      ballStagger: [80, 240],
 
       // What the ball has to hit to count, as fractions of the plate box: the
       // TIMBER, not the box. A galleon plate is mostly rigging and air, and a
@@ -204,10 +306,10 @@ const NAVY = (() => {
       // below its middle.
       hullTarget: { x: 0.42, y: 0.20, drop: 0.30 },
 
-      // Impacts before a hull goes down. Back to three now that hits are earned
-      // geometrically rather than rolled: most shots miss, so four would have
-      // made a sinking something you had to sit and wait for.
-      hitsToSink: 3,
+      // Impacts before a hull goes down. Five, because she is no longer being
+      // shot at by one ship at a time: once the fleet piles onto a wounded hull
+      // the hits arrive together, and four made that a formality.
+      hitsToSink: 5,
 
       // How long a shot's own scheduling stays valid, as a multiple of
       // engageDistance. Volleys are scheduled ahead of time from a predicted
@@ -626,6 +728,9 @@ const NAVY = (() => {
       // animation existing, and every bug in this file that made ships vanish
       // came from leaning on something incidental. Say it outright.
       ship.el.style.opacity = 1;
+      ship.target = null;
+      ship.firedAt = -Infinity;
+      ship.reload = 0;
       // Which passage this is. Every volley scheduled ahead of time carries the
       // generation of both ships, so a schedule made for a ship that has since
       // gone down and been replaced is recognised as stale and dropped rather
@@ -659,6 +764,10 @@ const NAVY = (() => {
 
     function retire(ship, sunk) {
       if (ship.anim) { ship.anim.cancel(); ship.anim = null; }
+      // Whoever was hunting her has lost their target, and must not go on
+      // scoring an empty patch of sea as the most attractive thing in range.
+      fleet.forEach((s) => { if (s.target === ship) s.target = null; });
+      ship.target = null;
       ship.el.style.opacity = 0;
       ship.el.removeAttribute("transform");
       ship.state = "idle";
@@ -672,23 +781,126 @@ const NAVY = (() => {
       ask(atSea().length < F.minAtSea ? rand(300, 1100) : rand(...F.respawnDelay) * 1000);
     }
 
-    // ---- system 2: proximity and gunnery ------------------------------------
+    // ---- system 2: choosing a fight -----------------------------------------
+    /**
+     * When this ship will next look around for someone to shoot at.
+     *
+     * The scheduling still comes from the analytic encounter windows — the only
+     * cheap way to know, at the moment she sails, when she will ever be near
+     * anyone. But what it schedules is no longer a volley at a named ship. It
+     * schedules a DECISION, and the target is chosen when the moment arrives,
+     * from what is actually happening then. That is the difference between a
+     * fleet that exchanges fire on a timetable and one that picks on somebody.
+     *
+     * Marks from different pairs are thinned, because one look around covers
+     * every ship in range — a captain does not decide once per enemy.
+     */
     function scheduleEncounters(ship) {
       const now = performance.now();
+      const mine = [];
+      const theirs = new Map();
+
       atSea().forEach((other) => {
         if (other === ship) return;
-        // Every window they share, and a volley every few seconds THROUGH each
-        // one, not a single shot at the closest point. A pass in company is a
-        // running fight.
-        const genA = ship.voyage, genB = other.voyage;
         for (const [entry, exit] of engagementWindows(ship, other, C.engageDistance)) {
           for (let t = entry; t < exit; t += rand(...C.reengageEvery) * 1000) {
             if (t <= now) continue;
-            if (rand01() > C.engageChance) continue;
-            later(() => engage(ship, genA, other, genB), t - now);
+            mine.push(t);
+            if (!theirs.has(other)) theirs.set(other, []);
+            theirs.get(other).push(t);
           }
         }
       });
+
+      // BOTH ships get the moment, not just the one who has just sailed.
+      //
+      // This used to arm only her, and it was fine while a volley fired both
+      // ways at once — one schedule, two broadsides. Making the broadside
+      // one-sided quietly broke it: a ship already at sea when another sailed
+      // had no decision points of her own against the newcomer, so she could
+      // only ever return fire, never open it. Gunnery across the fleet halved,
+      // measured at six balls in forty seconds.
+      const arm = (who, times) => {
+        times.sort((p, q) => p - q);
+        const gen = who.voyage;
+        let last = -Infinity;
+        const apart = C.reengageEvery[0] * 1000 * 0.6;
+        for (const t of times) {
+          if (t - last < apart) continue;
+          last = t;
+          // Nudged apart so the two captains are not deciding on the same beat.
+          later(() => consider(who, gen), t - now + rand(0, 900));
+        }
+      };
+      arm(ship, mine);
+      theirs.forEach((times, other) => arm(other, times));
+    }
+
+    /**
+     * Look around and pick someone worth firing on.
+     *
+     * The whole tactical layer is this scoring. Every term is a sentence about
+     * how a crew picks a fight, and between them they produce the behaviour
+     * without anyone coordinating anything:
+     *
+     *  - a hull already hurt is worth finishing, so damage attracts fire. This
+     *    is what makes ships GANG UP: the moment one is wounded she becomes the
+     *    best target for everyone in range at once, and it compounds.
+     *  - so does someone already firing on her, directly.
+     *  - a ship busy with somebody else is not watching you, which is the
+     *    opening for the third ship in a fight.
+     *  - and a ship shooting at ME gets answered.
+     *  - all of it discounted by range, because a far target is a wasted
+     *    broadside.
+     */
+    function consider(ship, gen) {
+      if (ship.state !== "sailing" || ship.voyage !== gen) return;
+      const now = performance.now();
+      // Still reloading. She may want a fight and be in no position to start
+      // one — see CONFIG.combat.reload.
+      if (now - (ship.firedAt || -Infinity) < ship.reload) return;
+      const me = positionAt(ship, now);
+      if (!me) return;
+      const T = C.tactics;
+
+      let best = null, bestScore = 0, bestRange = 0;
+      for (const other of atSea()) {
+        if (other === ship) continue;
+        const p = positionAt(other, now);
+        if (!p) continue;
+        const d = Math.hypot(p.x - me.x, p.y - me.y);
+        if (d > C.engageDistance) continue;
+
+        const onHer = fleet.filter(
+          (s) => s !== ship && s.state === "sailing" && aimingAt(s) === other).length;
+        const hers = aimingAt(other);
+        let score = 1;
+        score += T.wounded * (other.hits / C.hitsToSink);
+        score += T.piling * onHer;
+        if (hers && hers !== ship) score += T.distracted;
+        if (hers === ship) score += T.underFire;
+        score *= 1 - T.rangeBias * (d / C.engageDistance);
+
+        if (score > bestScore) { bestScore = score; best = other; bestRange = d; }
+      }
+      if (!best) return;
+
+      // Even having chosen, she may hold fire — and the further off her chosen
+      // target is, the more likely she does. See CONFIG.combat.holdFire.
+      const r = bestRange / C.engageDistance;
+      if (rand01() > C.engageChance * (1 - r * r * C.holdFire)) return;
+
+      ship.target = best;
+      ship.aimedAt = now;
+      ship.firedAt = now;
+      ship.reload = rand(...C.reload) * 1000;   // rolled per broadside, not per ship
+      engage(ship, gen, best, best.voyage);
+    }
+
+    /** Who this ship is firing on RIGHT NOW, not who she once fired on. */
+    function aimingAt(ship) {
+      if (!ship.target || ship.target.state !== "sailing") return null;
+      return performance.now() - ship.aimedAt < C.tactics.memory ? ship.target : null;
     }
 
     /** Are these two, right now, actually the pair this volley was planned for
@@ -702,17 +914,38 @@ const NAVY = (() => {
       return Math.hypot(pa.x - pb.x, pa.y - pb.y) <= C.engageDistance * C.rangeSlack;
     }
 
+    /**
+     * One ship's broadside at another — one-sided on purpose.
+     *
+     * It used to fire both ways at once, which is why nothing but a duel could
+     * ever happen: an exchange was a closed pair by construction. Now being
+     * shot at merely gives the target a reason to look around sooner, and what
+     * she does about it is her own decision — she may answer, or she may have a
+     * better target, or she may already be somebody's prey and stay it.
+     */
     function engage(a, genA, b, genB) {
       if (!still(a, genA, b, genB)) return;
       if (engagements >= C.maxSimultaneous) return;      // the hard ceiling
       engagements++;
-      // Neither fires on the same beat as the other.
       fire(a, genA, b, genB, 0);
-      fire(b, genB, a, genA, rand(...C.volleyStagger));
+      // She notices. Whether she answers THIS ship is up to her.
+      later(() => consider(b, genB), rand(...C.volleyStagger));
       later(() => { engagements = Math.max(0, engagements - 1); }, 2600);
     }
 
     function fire(shooter, genS, target, genT, delay) {
+      // A ragged row of guns going off, not one. Each ball is a separate
+      // shot — separately aimed, separately thrown off, separately checked on
+      // arrival — so the broadside spreads and some of it falls short.
+      let when = delay;
+      const guns = Math.round(rand(...C.ballsPerVolley));
+      for (let g = 0; g < guns; g++) {
+        gun(shooter, genS, target, genT, when, g === 0);
+        when += rand(...C.ballStagger);
+      }
+    }
+
+    function gun(shooter, genS, target, genT, delay, smokes) {
       later(() => {
         // Checked again HERE, not only when the exchange opened: the stagger
         // means this shot is taken up to a second later, and a second is long
@@ -721,10 +954,9 @@ const NAVY = (() => {
         const now = performance.now();
         const from = positionAt(shooter, now);
         const flight = rand(...C.ballFlight);
-        // Lead the target: aim at where she WILL be, not where she is. This is
-        // free here — her position at impact is the same arithmetic as her
-        // position now.
-        // Where she will be when it gets there — and specifically where her
+        // Lead her: aim at where she WILL be, not where she is — free here,
+        // since her position at impact is the same arithmetic as her position
+        // now. And specifically where her HULL will be — and specifically where her
         // HULL will be, which is not where her plate's centre will be. The
         // plate's middle is up among the yards; the timber sits a third of a
         // box lower. Aimed at the middle, a shot with zero error still landed
@@ -748,7 +980,9 @@ const NAVY = (() => {
         const to = { x: aim.x + Math.cos(dir) * off,
                      y: aim.y + Math.sin(dir) * off };
 
-        muzzle(from, to, shooter.beam);
+        // One cloud for the whole broadside — the guns are a few feet apart and
+        // their smoke is one bank of it, not a puff per barrel.
+        if (smokes) muzzle(from, to, shooter.beam);
         shoot(from, to, flight, () => {
           // THE BALL DECIDES, NOT A DIE. Where it came down, against where she
           // actually is at that instant.
@@ -986,6 +1220,19 @@ const NAVY = (() => {
       const now = performance.now();
       const at = positionAt(ship, now);
       if (at) burst(at, ship.beam, shooter);
+
+      // Blood in the water: everyone in range of her looks round. They are not
+      // told to attack her — they go and score their options like anyone else,
+      // and she is simply now the most attractive thing on the water.
+      if (at) {
+        for (const other of atSea()) {
+          if (other === ship) continue;
+          const p = positionAt(other, now);
+          if (!p || Math.hypot(p.x - at.x, p.y - at.y) > C.engageDistance) continue;
+          const gen = other.voyage;
+          later(() => consider(other, gen), rand(...C.tactics.alarm));
+        }
+      }
       if (ship.hits >= C.hitsToSink) { sink(ship); return; }
       g.classList.add(`dmg-${Math.min(2, ship.hits)}`);
 
