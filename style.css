@@ -87,6 +87,15 @@
   --r:    4px;
 
   --serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  /* The masthead only. IM Fell English is a digitisation of the punches John
+     Fell brought to Oxford in the 1670s — the same century as the plates in
+     the margins, and it carries the same unevenness, because it was cut by
+     hand and the digitisation kept the rough inking rather than cleaning it
+     up. That is exactly wrong for reading numbers off and exactly right for
+     the head of a chart, so it is scoped to the masthead and nothing else:
+     the data below stays in Plex, where legibility is the whole job. */
+  --display:    "IM Fell English", "Iowan Old Style", Georgia, serif;
+  --display-sc: "IM Fell English SC", "IM Fell English", Georgia, serif;
   --sans:  "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -432,15 +441,33 @@ a:hover { color: var(--coffee-deep); }
 .masthead { padding: var(--s7) 0 var(--s5); text-align: center; }
 
 .masthead h1 {
-  font-size: var(--t-display);
-  line-height: 1.1;
-  font-variation-settings: "SOFT" 0, "WONK" 1, "opsz" 60;
+  font-family: var(--display);
+  /* IM Fell ships one weight. Left at 500 the browser synthesises a bold and
+     smears the very roughness the face is chosen for. */
+  font-weight: 400;
+  font-variation-settings: normal;
+  font-size: calc(var(--t-display) * 1.18);   /* smaller x-height than Fraunces */
+  line-height: 1.05;
+  letter-spacing: 0;
 }
-.masthead .kicker { margin: 0 0 var(--s3); color: var(--ink-on-ground); }
+/* Real small caps rather than `text-transform`, which is why the uppercase the
+   .label class applies has to be turned off — transformed to caps first, the SC
+   face has no lowercase left to render small. */
+.masthead .kicker {
+  margin: 0 0 var(--s3);
+  color: var(--ink-on-ground);
+  font-family: var(--display-sc);
+  font-weight: 400;
+  text-transform: none;
+  font-size: 0.9375rem;
+  letter-spacing: 0.16em;
+}
 .masthead .sub {
   margin: var(--s2) 0 0;
   color: var(--ink-on-ground);
-  font-size: var(--t-small);
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.0625rem;
 }
 
 /* Double rule — a letterpress/chart convention, and a cheap way to make a
