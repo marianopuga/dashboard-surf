@@ -105,7 +105,7 @@ const NAVY = (() => {
       seed: null,
 
       // How many times a course may be re-drawn to find one that keeps clear
-      // of the ships already at sea. See `combat.minSeparation`.
+      // of the ships already at sea. See `combat.clearMargin`.
       courseAttempts: 24,
     },
 
@@ -123,20 +123,27 @@ const NAVY = (() => {
       // approach instead of only at the pass.
       engageDistance: 170,
 
-      // The floor: no two hulls ever come closer than this.
+      // HOW CLOSE TWO HULLS MAY COME — as a multiple of their own size, not in
+      // chart units.
       //
-      // It is also, indirectly, the cap on how many ships can be at sea, and
-      // therefore on how violent the sea can get. They share one lane, and the
-      // lane's usable width is about 70 units — bounded by the shore on one
-      // side and the edge of the plate on the other. At 82 no two hulls could
-      // pass abreast at all, so every extra ship had to be separated ALONG the
-      // lane instead, and only three fitted at a time however large the pool.
+      // The old floor was a single distance, 58, and ships sailed straight
+      // through each other anyway. The reason is that it measured them as if
+      // they were round. A galleon plate is 1.25 times taller than she is
+      // wide, and the lane runs north-south, so nearly every approach is one
+      // ship overtaking another ALONG it — the one direction the ships are
+      // biggest in and the one the check under-measured. Two 45-unit hulls at
+      // 58 apart abreast leave 13 units of clear water; stacked bow to stern
+      // they leave two, which is what "going over each other" looked like.
       //
-      // 58 is measured from the hulls themselves rather than chosen: they run
-      // 34-56 units of beam, so two average ones at 58 apart still leave a
-      // clear 13 units of water between their edges. Below about 46 they would
-      // actually touch.
-      minSeparation: 58,
+      // So separation is now measured on an ellipse the shape of the ship: the
+      // gap is divided by the hulls' combined half-width across and their
+      // combined half-height along, and 1.0 means exactly touching.
+      clearMargin: 1.12,
+
+      // The size of that ellipse, as fractions of the plate box. The whole box:
+      // it is mostly rigging and air up top, but rigging drawn across another
+      // ship's hull reads as overlap just as plainly as timber would.
+      footprint: { x: 0.5, y: 0.5 },
 
       // Not every near pass is a fight — otherwise proximity becomes a rule the
       // eye learns in a minute, and a ship that always fires when it can is a
@@ -452,6 +459,19 @@ const NAVY = (() => {
     return out;
   }
 
+  /**
+   * How far apart two hulls are, in their own units: the gap divided by the
+   * ship-shaped ellipse that just contains both of them. 1.0 is touching,
+   * below 1.0 is overlapping, and it is directly comparable between a pair
+   * abreast and a pair in line astern — which plain distance is not.
+   */
+  function hullGap(a, b, pa, pb) {
+    const F = CONFIG.combat.footprint;   // it sits with the separation floor
+    const rx = (a.beam + b.beam) * F.x;
+    const ry = (geom.hullUp(a.beam) + geom.hullUp(b.beam)) * 2 * F.y;
+    return Math.hypot((pa.x - pb.x) / rx, (pa.y - pb.y) / ry);
+  }
+
   function closestApproach(a, b) {
     const from = Math.max(a.startedAt, b.startedAt);
     const to = Math.min(a.startedAt + a.duration, b.startedAt + b.duration);
@@ -461,7 +481,7 @@ const NAVY = (() => {
       for (let t = lo; t <= hi; t += step) {
         const pa = positionAt(a, t), pb = positionAt(b, t);
         if (!pa || !pb) continue;
-        const d = Math.hypot(pa.x - pb.x, pa.y - pb.y);
+        const d = hullGap(a, b, pa, pb);
         if (d < best.d) best = { d, when: t };
       }
     };
@@ -539,33 +559,44 @@ const NAVY = (() => {
       // that has room to spare, and along-track distance — which is what
       // actually brings two ships into range of each other — is left free.
       // Nobody waits, the sea fills, and the fighting follows.
+      // Candidate offsets, furthest from everyone already at sea first — but
+      // ALL of them, tried in that order, because the best side of the lane is
+      // not always the one with a clear passage: a course is a course through
+      // time, and the ship two lanes over may be the one you overtake.
       const taken = others.map((o) => o.lateral);
       const [lo, hi] = F.lateral;
-      let lateral = 0, bestApart = -Infinity;
+      const lanes = [];
       for (let k = 0; k <= 8; k++) {
-        const cand = lo + ((hi - lo) * k) / 8;
-        const apart = taken.length ? Math.min(...taken.map((o) => Math.abs(cand - o))) : Infinity;
-        if (apart > bestApart) { bestApart = apart; lateral = cand; }
+        const x = lo + ((hi - lo) * k) / 8;
+        // Not Infinity for an empty sea: every entry would then be Infinity,
+        // every comparison Infinity-Infinity = NaN, and the sort order
+        // whatever the engine felt like. A big finite number sorts.
+        lanes.push({ x, apart: taken.length ? Math.min(...taken.map((o) => Math.abs(x - o)))
+                                            : 1e6 });
       }
-      lateral += rand(-3, 3);        // so the lanes are not visibly quantised
+      lanes.sort((p, q) => q.apart - p.apart);
 
-      // A light re-roll for the one case the lane cannot fix: two hulls that
-      // would actually touch. Never a delay — just another course.
+      // THE CLEARANCE CHECK IS BINDING. It did not used to be: it re-rolled a
+      // few courses and then sailed the last one whether or not it cleared,
+      // which is how hulls ended up passing through each other. If nothing
+      // clears, she does not sail — she waits a moment and asks again. That
+      // cannot deadlock, because the ships she is waiting on are moving up the
+      // lane and away from the entry the whole time.
       let v = null;
       for (let attempt = 0; attempt < F.courseAttempts; attempt++) {
+        const lateral = lanes[attempt % lanes.length].x + rand(-3, 3);
         const cand = planVoyage(counter + attempt, lateral);
-        const probe = { track: cand.track, startedAt: baseStart,
+        const probe = { track: cand.track, beam: cand.beam, startedAt: baseStart,
                         duration: (geom.runLength / cand.speed) * 1000 };
         let gap = Infinity;
         for (const o of others) {
           const c = closestApproach(probe, o);
           if (c) gap = Math.min(gap, c.d);
         }
-        v = cand;
-        if (gap >= C.minSeparation) break;
+        if (gap >= C.clearMargin) { v = cand; v.lateral = lateral; break; }
       }
+      if (!v) { ask(rand(1400, 3000)); return; }   // no clear water: not yet
       counter++;
-      v.lateral = lateral;
 
       const startedAt = baseStart;
 
@@ -680,7 +711,7 @@ const NAVY = (() => {
         muzzle(from, to, shooter.beam);
         shoot(from, to, flight, () => {
           if (target.state === "sailing" && rand01() < C.hitChance) {
-            damage(target);                       // burst is raised inside
+            damage(target, from);                 // burst is raised inside
           } else {
             // A miss is not nothing: the ball goes into the sea, and the sea
             // shows it. Without this the shots that miss simply stop existing,
@@ -894,12 +925,12 @@ const NAVY = (() => {
     }
 
     // ---- system 3: progressive damage ---------------------------------------
-    function damage(ship) {
+    function damage(ship, shooter) {
       ship.hits++;
       const g = ship.el;
       const now = performance.now();
       const at = positionAt(ship, now);
-      if (at) burst(at, ship.beam);
+      if (at) burst(at, ship.beam, shooter);
       if (ship.hits >= C.hitsToSink) { sink(ship); return; }
       g.classList.add(`dmg-${Math.min(2, ship.hits)}`);
 
@@ -1079,19 +1110,39 @@ const NAVY = (() => {
       }
     }
 
-    /** Splinters and flame where a ball went in. */
-    function burst(at, w) {
+    /**
+     * Splinters thrown out of the side a ball went into.
+     *
+     * The first version drew seven equal spokes radiating from the ship's
+     * centre, and it read as a symbol stamped ON TOP of her — a sparkle, not an
+     * impact, and it covered the hull at the one moment you want to see the
+     * hull. Two things fix that. The marks start at the point of impact, which
+     * is on the flank facing the shooter, not at her middle; and they are
+     * thrown in a CONE running on in the ball's own direction, so they fly off
+     * the far side into open water instead of spreading over her deck.
+     *
+     * Uneven lengths, uneven angles. Equal spokes are what made it a symbol.
+     */
+    function burst(at, w, shooter) {
+      const ang = shooter ? Math.atan2(at.y - shooter.y, at.x - shooter.x)
+                          : rand(0, Math.PI * 2);
+      // the struck flank: back along the shot, at the edge of the hull
+      const ix = at.x - Math.cos(ang) * w * 0.40;
+      const iy = at.y - Math.sin(ang) * w * 0.24;
       const g = transient(root, 900);
-      const ticks = Array.from({ length: 7 }, () => {
-        const ang = rand(0, Math.PI * 2), len = rand(0.10, 0.26) * w;
-        return `<path class="hit-tick" d="M${(Math.cos(ang) * w * 0.06).toFixed(1)} ${(Math.sin(ang) * w * 0.06).toFixed(1)}
-                 l${(Math.cos(ang) * len).toFixed(1)} ${(Math.sin(ang) * len).toFixed(1)}"/>`;
+      const ticks = Array.from({ length: 5 }, () => {
+        const a2 = ang + rand(-0.85, 0.85);
+        const len = rand(0.08, 0.30) * w;
+        const lead = rand(0.02, 0.12) * w;      // splinters do not all start together
+        return `<path class="hit-tick"
+                 d="M${(Math.cos(a2) * lead).toFixed(1)} ${(Math.sin(a2) * lead).toFixed(1)}
+                    l${(Math.cos(a2) * len).toFixed(1)} ${(Math.sin(a2) * len).toFixed(1)}"/>`;
       }).join("");
-      g.innerHTML = `<g transform="translate(${at.x.toFixed(1)},${at.y.toFixed(1)})">${ticks}</g>`;
+      g.innerHTML = `<g>${ticks}</g>`;
+      const T = (k) => `translate(${ix.toFixed(1)}px,${iy.toFixed(1)}px) scale(${k})`;
       g.firstElementChild.animate(
-        [{ transform: `translate(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px) scale(0.3)`, opacity: 1 },
-         { transform: `translate(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px) scale(1.35)`, opacity: 0 }],
-        { duration: 760, easing: "cubic-bezier(.1,.75,.3,1)", fill: "forwards" }
+        [{ transform: T(0.25), opacity: 0.95 }, { transform: T(1.3), opacity: 0 }],
+        { duration: 700, easing: "cubic-bezier(.1,.75,.3,1)", fill: "forwards" }
       );
     }
 

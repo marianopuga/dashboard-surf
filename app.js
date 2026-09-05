@@ -703,8 +703,9 @@ function renderChart(rows, cond, activeId) {
   // (which cluster within ~150–250 in this projection) and of the field-arrow
   // band. Chosen once against the geography, not derived from spot positions,
   // because they are chart furniture, not data.
-  // No rose is drawn any more, but the rhumb lines still need a node to
-  // radiate from — an unmarked bearing node is ordinary on a portolan chart.
+  // Neither the rose nor the rhumb lines are drawn on the water any more; the
+  // node is kept because the open-water fix is still the reference the fleet's
+  // lane and the marginalia are placed against.
   const ROSE = { x: 266, y: 566, r: 20 };
 
   // The fleet's markup belongs to fleet.js along with its behaviour.
@@ -752,9 +753,12 @@ function renderChart(rows, cond, activeId) {
     <rect class="sea" x="${VIEW.x}" y="0" width="${VIEW.w}" height="${COAST.H}"/>
     <g clip-path="url(#sea-clip)">
       ${COAST.contours.map((d) => `<path class="depth" d="${d}"/>`).join("")}
-      <g class="chart-chrome chrome-under">
-        ${CHROME.rhumbLines(ROSE.x, ROSE.y, 620)}
-      </g>
+      <!-- The rhumb lines used to fan across the water from here. Taken out:
+           the sea already carries its own drawn crests, and a second family of
+           straight lines over the top of them read as ruling rather than as
+           water. They still fan across the PAGE behind everything, which is
+           where they do the job of saying "chart" without competing with the
+           swell. -->
     </g>
     ${field}
     <g class="chart-chrome fleet-layer" clip-path="url(#sea-clip)"></g>

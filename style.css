@@ -1065,8 +1065,9 @@ a:hover { color: var(--coffee-deep); }
 .hit-tick {
   fill: none;
   stroke: var(--raisin);
-  stroke-width: 1.3;
+  stroke-width: 1;
   stroke-linecap: round;
+  opacity: 0.8;
 }
 .splash-ring, .splash-lip {
   fill: none;
