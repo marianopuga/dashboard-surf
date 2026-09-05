@@ -504,7 +504,7 @@ function sailFleet(svg) {
         CHROME.plate("assets/ship-cutout.png", 0, 0, beam, "ship", SHIP_ASPECT)}</g>`,
     runLength: LANE_Y1 - LANE_Y0,
   });
-  NAVY.launch(svg);
+  window.__navy = NAVY.launch(svg);
 }
 
 /**

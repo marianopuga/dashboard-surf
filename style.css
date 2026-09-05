@@ -1004,6 +1004,49 @@ a:hover { color: var(--coffee-deep); }
   50%     { opacity: 0.26; transform: scale(1.12); }
 }
 
+/* --- gunnery, damage and sinking ----------------------------------------- */
+/* All of it in the chart's own ink. A grey puff or a soft particle would be the
+   one thing on this page that did not look drawn. */
+.cannonball { fill: var(--raisin); opacity: 0.85; pointer-events: none; }
+
+.sink-bubble {
+  fill: none;
+  stroke: var(--coffee);
+  stroke-width: 0.8;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Smoke as open curls of line rather than a blur. */
+.smoke path {
+  fill: none;
+  stroke: var(--raisin);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0.42;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .smoke {
+    transform-box: fill-box;
+    animation: smoke-curl 3.4s ease-in-out infinite;
+  }
+}
+@keyframes smoke-curl {
+  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
+  50%      { transform: translate(var(--drift, 4px), -3px); opacity: 0.5; }
+}
+
+/* Two steps of damage before she goes, not a jump from sound to sinking: a
+   list that deepens, and the hull losing a little of its ink. */
+.ship-voyage.dmg-1 .ship-hull { opacity: 0.9; }
+.ship-voyage.dmg-2 .ship-hull { opacity: 0.78; }
+/* The roll stops once she is down by the head. A wallowing hull does not ride
+   the swell any more, and leaving the animation running fights the list. */
+.ship-voyage.dmg-2 .ship-roll,
+.ship-voyage.is-sinking .ship-roll,
+.ship-voyage.is-sinking .ship-heave { animation: none; }
+.ship-voyage.dmg-2 .ship-roll { transform: rotate(6deg); }
+
 /* --- the cartouche ------------------------------------------------------ */
 /* The three numbers the chart's own graphics can only express as shape and
    direction. Framed with the double rule a real chart cartouche always has. */
