@@ -1224,6 +1224,13 @@ a:hover { color: var(--coffee-deep); }
   gap: var(--s3);
   padding: 0 var(--s5) var(--s4);
   align-items: start;
+  /* Sized against ITS OWN width, not the window's. What the two day strips
+     have to fit in is the sheet, and the sheet is narrower than the viewport by
+     however much the chart column and the page margins take — 532px inside a
+     614px window. A viewport media query cannot see that, so the stacking rule
+     never fired where it was needed and the fifth tile of each day was simply
+     cut off with nothing to say it was there. */
+  container-type: inline-size;
 }
 /* Today and tomorrow sit side by side — five parts each, the same shape, so the
    two days can be compared at a glance. They collapse to one column when the
@@ -1231,11 +1238,15 @@ a:hover { color: var(--coffee-deep); }
 /* Two five-tile strips need roughly 500px between them; below that they stack
    rather than each getting squeezed into its own scrollbar. */
 .fc-days { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
-@media (max-width: 540px) {
+
+/* Two five-tile strips need ~660px between them. Below that they stack, so each
+   gets the full width and all five parts of the day are visible — side by side
+   in a narrow sheet each column got ~265px, which fits four. */
+@container (max-width: 660px) {
   .fc-days { grid-template-columns: 1fr; gap: var(--s3); }
-  /* Claw back the side padding so five tiles still fit a phone without the
-     day strip needing its own scroll — the week strip may scroll, a single
-     day should not. */
+}
+@media (max-width: 540px) {
+  /* Claw back the side padding so five tiles still fit a phone. */
   .fc { padding-left: var(--s3); padding-right: var(--s3); }
   .fc-tile { width: 58px; }
 }
@@ -1269,7 +1280,15 @@ a:hover { color: var(--coffee-deep); }
 
 .fc-strip {
   display: flex;
+  /* Wrap rather than run off the edge. The week is ten columns and will not fit
+     any sensible sheet width in one line; scrolling it hid half the week behind
+     a gesture nothing advertised, which read as the forecast being missing
+     rather than as being off to the right. Overflow stays as a last resort for
+     widths too narrow even to wrap. */
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 2px;
+  row-gap: var(--s2);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
