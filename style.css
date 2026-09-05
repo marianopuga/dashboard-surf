@@ -1017,25 +1017,6 @@ a:hover { color: var(--coffee-deep); }
   pointer-events: none;
 }
 
-/* Smoke as open curls of line rather than a blur. */
-.smoke path {
-  fill: none;
-  stroke: var(--raisin);
-  stroke-width: 1.1;
-  stroke-linecap: round;
-  opacity: 0.42;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .smoke {
-    transform-box: fill-box;
-    animation: smoke-curl 3.4s ease-in-out infinite;
-  }
-}
-@keyframes smoke-curl {
-  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
-  50%      { transform: translate(var(--drift, 4px), -3px); opacity: 0.5; }
-}
-
 /* Two steps of damage before she goes, not a jump from sound to sinking: a
    list that deepens, and the hull losing a little of its ink. */
 .ship-voyage.dmg-1 .ship-hull { opacity: 0.9; }
@@ -1082,10 +1063,6 @@ a:hover { color: var(--coffee-deep); }
   stroke-linecap: round;
   opacity: 0.6;
 }
-/* Her smoke thins out once she is going down — it should not outlast the hull
-   by much, but it should not snap off either. */
-.ship-voyage.is-sinking .smoke { animation: smoke-out 2.8s ease-out forwards; }
-@keyframes smoke-out { to { opacity: 0; } }
 /* The roll stops once she is down by the head. A wallowing hull does not ride
    the swell any more, and leaving the animation running fights the list. */
 .ship-voyage.dmg-2 .ship-roll,

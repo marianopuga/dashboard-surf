@@ -409,7 +409,8 @@ let FLEET_NODE = null;
  *   headland level with its bow is one the centre never sees. Point sampling
  *   put hulls up to 48 units inland off Long Reef and Dee Why.
  */
-function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = null }) {
+function shipTrack({ lateral = 0, beam = 0, halfH = 0, halfW = 0, samples = 48,
+                     wander = null }) {
   const pts = [];
   const N = samples;
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
@@ -424,6 +425,19 @@ function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = nu
   // border until the run is nearly done, then let go so the exit still carries
   // her off the chart.
   const eastLimit = COAST.W - 6 - beam;
+  // And an exit that actually clears the frame. Releasing the clamp was not
+  // enough on its own: the authored route ends a few units past the eastern
+  // edge, which for a narrow hull left six units of her still inside it when
+  // the voyage finished and she was retired — she blinked out with her bow
+  // showing.
+  //
+  // Note this uses halfW and NOT `beam`. `beam` here is a CLEARANCE width —
+  // the caller passes 42% of the real one, because that is what the visible
+  // ink spans and it is the shoreline this is keeping her off. The plate she
+  // is drawn with is wider than that, so measuring the exit against `beam`
+  // left her three units inside the frame: fixed for every ship whose route
+  // already ran east, and still broken for the one on the western lane.
+  const exitX = COAST.W + halfW + 4;
 
   for (let i = 0; i <= N; i++) {
     const t = i / N;
@@ -445,10 +459,11 @@ function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = nu
     }
     const release = t < 0.85 ? 0 : (t - 0.85) / 0.15;
     const held = Math.min(routeX, eastLimit);
-    pts.push({
-      x: Math.max(held + (routeX - held) * release, shore + beam + MIN_CLEAR),
-      y: Math.max(y, northLimit),
-    });
+    let x = Math.max(held + (routeX - held) * release, shore + beam + MIN_CLEAR);
+    // Carried out past the edge over the same last stretch, and only ever
+    // eastward, so a course that already leaves cleanly is not pulled back.
+    if (exitX > x) x += (exitX - x) * release * release;
+    pts.push({ x, y: Math.max(y, northLimit) });
   }
   return pts;
 }

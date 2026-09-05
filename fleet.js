@@ -178,19 +178,36 @@ const NAVY = (() => {
       ballFlight: [1100, 1700],
       ballArc: 0.24,
 
-      // A shot can miss — damage that is certain makes the outcome a countdown.
-      hitChance: 0.72,
-
-      // Impacts before a hull goes down.
+      // HOW ACCURATE A GUNNER IS, as the spread of his aim in chart units:
+      // a fixed part, plus a part that grows with the range.
       //
-      // Three, with the hit rate at 0.82, meant a pair that closed once
-      // usually killed: about four shots are exchanged in a pass, and three of
-      // four landing ends it. Measured after wiping the fleet, a brand new ship
-      // was going down again inside twenty seconds. Four hits at 0.72 means a
-      // ship normally survives her first exchange and carries the damage, so a
-      // sinking is the end of a running quarrel rather than the result of one
-      // meeting — which is also what makes the wreck worth watching.
-      hitsToSink: 4,
+      // There used to be a `hitChance` here — a die rolled when the ball
+      // arrived, with nothing to do with where the ball had gone. So a shot
+      // that visibly fell in the water could still register as a hit, and a
+      // ball that landed on the deck could be declared a miss and throw up
+      // spray on top of her. The die is gone. A shot is aimed at where she will
+      // be, that aim is thrown off by this much, the ball flies to wherever
+      // that lands it, and whether it HIT is then a question about the landing
+      // point and the hull — asked, not decided in advance.
+      //
+      // Set from the two ends that matter. A hull is about a 17x10 target, so
+      // the numbers below put roughly two shots in three on her at fifty units
+      // and about one in four at the edge of the engagement range, which is
+      // what "closer should be deadlier" means in figures rather than in
+      // spirit.
+      aimError: { base: 4, perUnit: 0.08 },
+
+      // What the ball has to hit to count, as fractions of the plate box: the
+      // TIMBER, not the box. A galleon plate is mostly rigging and air, and a
+      // ball through the shrouds is a miss. Measured off the cutout's alpha —
+      // the solid hull is the bottom third, centred about 0.30 of the box
+      // below its middle.
+      hullTarget: { x: 0.42, y: 0.20, drop: 0.30 },
+
+      // Impacts before a hull goes down. Back to three now that hits are earned
+      // geometrically rather than rolled: most shots miss, so four would have
+      // made a sinking something you had to sit and wait for.
+      hitsToSink: 3,
 
       // How long a shot's own scheduling stays valid, as a multiple of
       // engageDistance. Volleys are scheduled ahead of time from a predicted
@@ -358,8 +375,8 @@ const NAVY = (() => {
         <g class="ship-heave">
           <g class="ship-roll">
             <g class="ship-hull"></g>
-            <!-- Damage rides INSIDE roll and heave, so smoke leans with the
-                 hull instead of floating beside it. -->
+            <!-- Damage rides INSIDE roll and heave, so what is done to her
+                 leans with the hull instead of floating beside it. -->
             <g class="ship-harm"></g>
           </g>
         </g>
@@ -392,8 +409,9 @@ const NAVY = (() => {
 
     const track = geom.buildTrack({
       lateral: lateral == null ? rand(...F.lateral) : lateral,
-      beam: beam * 0.42,
+      beam: beam * 0.42,          // clearance width: what the ink actually spans
       halfH: geom.hullUp(beam),
+      halfW: beam * 0.5,          // the plate's true half-width, for the exit
       samples: F.samples,
       wander,
     });
@@ -706,20 +724,57 @@ const NAVY = (() => {
         // Lead the target: aim at where she WILL be, not where she is. This is
         // free here — her position at impact is the same arithmetic as her
         // position now.
-        const to = positionAt(target, now + flight);
-        if (!from || !to) return;
+        // Where she will be when it gets there — and specifically where her
+        // HULL will be, which is not where her plate's centre will be. The
+        // plate's middle is up among the yards; the timber sits a third of a
+        // box lower. Aimed at the middle, a shot with zero error still landed
+        // clean above her and counted as a miss, which is why closing the range
+        // made no difference at all: measured, a perfect shot at thirty units
+        // hit 19% of the time, no better than a wild one at a hundred and
+        // seventy. The gunner lays his gun on the hull.
+        const seen = positionAt(target, now + flight);
+        if (!from || !seen) return;
+        const aim = { x: seen.x,
+                      y: seen.y + geom.hullUp(target.beam) * 2 * C.hullTarget.drop };
+
+        // ...and misses it by this much. The magnitude is Rayleigh-distributed
+        // — the length of a two-dimensional Gaussian error — so most shots are
+        // near and the wild ones are rare, rather than every shot being wrong
+        // by some uniform amount.
+        const range = Math.hypot(aim.x - from.x, aim.y - from.y);
+        const sigma = C.aimError.base + C.aimError.perUnit * range;
+        const off = sigma * Math.sqrt(-2 * Math.log(1 - rand01()));
+        const dir = rand(0, Math.PI * 2);
+        const to = { x: aim.x + Math.cos(dir) * off,
+                     y: aim.y + Math.sin(dir) * off };
+
         muzzle(from, to, shooter.beam);
         shoot(from, to, flight, () => {
-          if (target.state === "sailing" && rand01() < C.hitChance) {
-            damage(target, from);                 // burst is raised inside
-          } else {
-            // A miss is not nothing: the ball goes into the sea, and the sea
-            // shows it. Without this the shots that miss simply stop existing,
-            // which made the gunnery read as unreliable rather than as fought.
-            splash(to, target.beam);
-          }
+          // THE BALL DECIDES, NOT A DIE. Where it came down, against where she
+          // actually is at that instant.
+          const her = target.state === "sailing"
+            ? positionAt(target, performance.now()) : null;
+          if (her && onTarget(to, her, target.beam)) damage(target, from);
+          else splash(to, target.beam);
         });
       }, delay);
+    }
+
+    /**
+     * Did a ball landing here strike that hull?
+     *
+     * An ellipse over the ship's TIMBER, which is not the same as her plate:
+     * the plate is a tall box that is mostly rigging and sky, and a ball
+     * through the shrouds has not hit anything. The hull sits low in the box,
+     * so the ellipse is dropped below its middle.
+     */
+    function onTarget(ball, her, beam) {
+      const T = C.hullTarget;
+      const h = geom.hullUp(beam) * 2;
+      // Same ellipse the gunner laid his gun on: centred on her timber, which
+      // is `drop` of a box below the middle of her plate.
+      return Math.hypot((ball.x - her.x) / (beam * T.x),
+                        (ball.y - (her.y + h * T.drop)) / (h * T.y)) <= 1;
     }
 
     function shoot(from, to, flight, onArrive) {
@@ -957,22 +1012,15 @@ const NAVY = (() => {
         splinters(at, w, 3);
       }
 
-      // Smoke, in the same engraved idiom as everything else: open curls of
-      // line, not a soft particle blur, which would be the one thing on the
-      // chart that did not look drawn.
-      const harm = g.querySelector(".ship-harm");
-      const b = ship.beam;
-      harm.insertAdjacentHTML("beforeend", `
-        <g class="smoke" style="--drift:${(rand(-1, 1) * 8).toFixed(1)}px">
-          <path d="M${(rand(-0.2, 0.2) * b).toFixed(1)} ${(-b * 0.30).toFixed(1)}
-                   c ${(b * 0.10).toFixed(1)} ${(-b * 0.10).toFixed(1)}
-                     ${(-b * 0.10).toFixed(1)} ${(-b * 0.20).toFixed(1)}
-                     ${(b * 0.04).toFixed(1)} ${(-b * 0.30).toFixed(1)}"/>
-          <path d="M${(rand(-0.2, 0.2) * b).toFixed(1)} ${(-b * 0.26).toFixed(1)}
-                   c ${(-b * 0.09).toFixed(1)} ${(-b * 0.09).toFixed(1)}
-                     ${(b * 0.11).toFixed(1)} ${(-b * 0.17).toFixed(1)}
-                     ${(-b * 0.03).toFixed(1)} ${(-b * 0.26).toFixed(1)}"/>
-        </g>`);
+      // No smoke. It was drawn as open curls of line rising off her masts, on
+      // the reasoning that a soft particle blur would be the one thing on the
+      // chart that did not look drawn — and the reasoning was right about the
+      // blur and wrong about the curls. At the size a ship actually renders,
+      // two thin wavy strokes above her do not read as smoke; they read as
+      // stray pen lines sitting on top of the boat, which is exactly what they
+      // were reported as, twice. The damage she has taken is already visible in
+      // the timber: she lists, and from the second hit she is missing her
+      // topmasts.
     }
 
     // ---- system 4: going down ------------------------------------------------
