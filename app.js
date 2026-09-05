@@ -1436,28 +1436,31 @@ function renderShell(swell, wind, tide, forecast, errors, tidePending) {
 }
 
 /**
- * Publish the left edge of the chart plate as --panel-left.
+ * Publish where the page's boxes actually begin, for the marginalia to line up
+ * against: --map-left for the chart plate, --panel-left for the readouts strip.
  *
- * The kraken in the bottom-left margin lines its galleon up with that edge.
- * Every earlier attempt computed it instead — `calc((100vw - 1180px) / 2)` —
- * and was wrong twice over: that is the wrap's border box, not where a panel
- * starts, and the panels do not even agree with each other.
+ * Measured rather than computed. Every earlier attempt derived it —
+ * `calc((100vw - 1180px) / 2)` — and was wrong twice over: that is the wrap's
+ * border box rather than where a panel starts, and the panels do not even
+ * agree with each other.
  *
  * Measured rather than derived, because the value depends on padding that
  * lives in media queries; anything computed in CSS has to duplicate those
  * rules and will drift the moment one of them changes.
  */
 function publishColumnEdge() {
-  // The chart plate specifically — "the box the map is inside of". It is NOT
-  // in line with the other panels: it measures 210 where the conditions strip
-  // measures 234 on a 1600px window, a 24px difference that is exactly what
-  // read as the ship sitting too far right.
-  const panel = document.querySelector(".chart-plate")
-             || document.querySelector(".conditions")
-             || document.querySelector(".wrap");
-  if (!panel) return;
-  const x = Math.max(0, Math.round(panel.getBoundingClientRect().left));
-  document.documentElement.style.setProperty("--panel-left", `${x}px`);
+  // TWO edges, because the page has two and they do not agree: the chart plate
+  // measures 210 where the conditions strip measures 234 on a 1600px window.
+  // A plate in the margin has to line up with whichever box actually sits
+  // beside it, so both are published and each marginal picks its own.
+  const edge = (sel, name) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    const x = Math.max(0, Math.round(el.getBoundingClientRect().left));
+    document.documentElement.style.setProperty(name, `${x}px`);
+  };
+  edge(".chart-plate", "--map-left");      // the box the map is inside of
+  edge(".conditions", "--panel-left");     // the readouts strip above it
 }
 
 async function main() {

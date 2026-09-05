@@ -241,7 +241,7 @@
      was winning: the plate was rendering at 352px where this rule asks for
      643px, which is exactly why the galleon never reached the column edge no
      matter what the offset said. */
-  width: max(260px, calc(var(--panel-left, 0px) / 0.371 + 24px));
+  width: max(260px, calc(var(--map-left, 0px) / 0.371 + 24px));
   aspect-ratio: 405 / 390;
   /* Pivot on the galleon itself, not the middle of the plate. Rotating about
      the centre moved the ship 7.2px sideways — 1.8% of the plate's width — and
@@ -250,12 +250,12 @@
      about the ship leaves the ship where it was put.
      38.3% across, 14.9% down: measured off the plate, not estimated. */
   transform-origin: 38.3% 14.9%;
-  transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 20%) rotate(3deg);
+  transform: translate(min(0px, calc(var(--map-left, 0px) - 38.3%)), 20%) rotate(3deg);
 }
 
 @media (min-width: 1400px) {
   .marg.marg-dragon { transform: translate(12%, 7%) scaleX(-1); }
-  .marg.marg-kraken { transform: translate(min(0px, calc(var(--panel-left, 0px) - 38.3%)), 15%) rotate(3deg); }
+  .marg.marg-kraken { transform: translate(min(0px, calc(var(--map-left, 0px) - 38.3%)), 15%) rotate(3deg); }
 }
 
 .marg-serpent {
@@ -307,53 +307,54 @@ body::after {
 @media (max-width: 480px) { .marginalia { display: none; } }
 
 /* --- the gutter marginalia -----------------------------------------------
-   Gessner's sea orm, in the left margin, fixed like the corner plates.
+   Gessner's sea orm, in the left margin beside the readouts strip.
 
-   It is a wide, shallow plate — wider than the one it replaced, which is why
-   the two swapped: at 2.077:1 it takes the tuck far better than it sat in the
-   bottom band. Flush with the window
-   edge and exactly twice the gutter wide, with the outer half filling the
-   margin and the inner half running under the content column. That reads as a
-   plate slipped beneath the sheet. Two things it is deliberately NOT: pushed
-   off the left of the window (cut by the screen, which always looks like a
-   mistake), and shrunk to fit inside the gutter (small enough to read as a
-   smudge). Both were tried.
+   Pinned by its RIGHT edge to that strip and allowed to run off the left of
+   the window — the mirror of what the kraken does in the bottom corner. That
+   is what makes it possible for it to be big: its size no longer has to fit
+   the gutter, because everything past the window edge simply is not there.
 
-       (100vw - 1180px)   is twice the gutter beside the content column
+   Its width is the gutter plus a fixed 320px overhang rather than a fraction
+   of the viewport, so the overhang stays constant while the plate grows with
+   the margin. A bigger overhang does not reveal more of the creature — the
+   visible strip is always exactly the gutter — it draws what IS visible at a
+   larger scale, which is what "make it bigger" means here.
 
-   Below 1340px that is under 160px, too little margin for it to be anything
-   but noise, so it is dropped. */
+   Below 1340px the gutter is under ~100px, too little showing to read as an
+   animal, so it is dropped.
+
+   `transform-origin: 100% 50%` for the same reason the kraken pivots on its
+   galleon: rotating about the centre would swing the right edge off the line
+   the translate just put it on. */
 .marg-lower {
   display: none;
-  top: auto;
   aspect-ratio: auto;
-  /* A gentler edge than the corner plates. `.marg` dissolves everything
-     outside the middle 42%, which suits a creature bleeding off the page but
-     would eat most of one meant to be looked at. */
+  /* A gentler edge than the corner plates, which dissolve everything outside
+     the middle 42% — that suits a creature bleeding off a corner, but this one
+     is meant to be looked at. */
   -webkit-mask-image: radial-gradient(ellipse 86% 86% at 50% 50%,
     #000 0 80%, rgba(0,0,0,0.74) 92%, transparent 100%);
   mask-image: radial-gradient(ellipse 86% 86% at 50% 50%,
     #000 0 80%, rgba(0,0,0,0.74) 92%, transparent 100%);
 }
 
-@media (min-width: 1800px) {
-  .marg-lower { opacity: 0.55; }
+@media (min-width: 1340px) {
+  /* `.marg` also matches this element and sets its own width later in the
+     file, so the rules below are scoped tightly enough to win — the same
+     specificity trap the corner plates fell into. */
+  .marg-lower { display: block; opacity: 0.46; }
+  .marg.marg-orm {
+    left: 0;
+    top: 22%;
+    width: min(900px, calc(var(--panel-left, 0px) + 320px));
+    aspect-ratio: 887 / 427;
+    transform-origin: 100% 50%;
+    transform: translateX(calc(var(--panel-left, 0px) - 100%)) rotate(-2deg);
+  }
 }
 
-@media (min-width: 1340px) {
-  .marg-lower {
-    display: block;
-    opacity: 0.46;
-    width: min(400px, calc(100vw - 1180px));
-  }
-  /* Raised, so its coils land in the gap between the conditions panel and the
-     chart rather than disappearing behind one of them. */
-  .marg-orm {
-    left: 0;
-    top: 24%;
-    aspect-ratio: 887 / 427;
-    transform: rotate(-4deg);
-  }
+@media (min-width: 1800px) {
+  .marg-lower { opacity: 0.55; }
 }
 
 
