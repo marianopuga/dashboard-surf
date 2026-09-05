@@ -414,10 +414,16 @@ function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = nu
   const N = samples;
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
   const reach = halfH + span;
-  // No eastern clamp. The route deliberately runs off the right-hand edge, and
-  // clamping it back on-plate would have parked the ships against the border
-  // instead of letting them leave.
   const northLimit = NO_GO_Y + halfH + 6;
+  // An eastern clamp that RELEASES over the last stretch.
+  //
+  // A hard clamp would park ships against the border instead of letting them
+  // leave, which is why there was none at all — but with no clamp, widening
+  // the lane so more ships could pass abreast pushed hulls off the right edge
+  // mid-passage. Both matter, and they matter at different times: hold the
+  // border until the run is nearly done, then let go so the exit still carries
+  // her off the chart.
+  const eastLimit = COAST.W - 6 - beam;
 
   for (let i = 0; i <= N; i++) {
     const t = i / N;
@@ -437,8 +443,10 @@ function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = nu
     for (let d = -reach; d <= reach; d += reach / 8) {
       shore = Math.max(shore, SHORE_X(clamp(y + d, 0, COAST.H)));
     }
+    const release = t < 0.85 ? 0 : (t - 0.85) / 0.15;
+    const held = Math.min(routeX, eastLimit);
     pts.push({
-      x: Math.max(routeX, shore + beam + MIN_CLEAR),
+      x: Math.max(held + (routeX - held) * release, shore + beam + MIN_CLEAR),
       y: Math.max(y, northLimit),
     });
   }

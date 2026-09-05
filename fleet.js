@@ -50,8 +50,9 @@ const NAVY = (() => {
       heel: [-6, -2],
 
       // A fixed sideways offset for the whole voyage — which side of the lane
-      // this ship favours, before any wander is added.
-      lateral: [-22, 22],
+      // this ship favours, before any wander is added. Wide enough that two
+      // ships can pass abreast, which is what lets more than three be at sea.
+      lateral: [-34, 34],
 
       // The noise that bends the course. `amplitude` is how far off the base
       // route a ship strays at most; `octaves` adds finer detail on top of the
@@ -91,18 +92,31 @@ const NAVY = (() => {
     },
 
     combat: {
-      // Two ships closer than this may engage. Comfortably larger than
-      // minSeparation, so an engagement is a near pass rather than a collision.
-      engageDistance: 165,
-
-      // The floor. Courses that would bring two hulls closer than this are
-      // rejected at spawn and re-drawn.
+      // Two ships closer than this may engage.
       //
-      // This is the number that lets systems 1 and 2 coexist. Combat needs
-      // ships to come close; two engraved hulls overlapping reads as a
-      // rendering fault, not as a fleet. Because every course is known before
-      // it is animated, both can be guaranteed rather than hoped for.
-      minSeparation: 82,
+      // Set from the shape of the lane, not by feel. The lane is ~70 units wide
+      // and ~600 long, so what separates two ships is almost always the
+      // distance ALONG it, not across — which means this figure is really
+      // "how far up the lane a gunner will bother shooting". At 165 only one
+      // pair in three ever qualified and the sea was quiet; at 240 ships in
+      // the same stretch of water are in range of each other most of the time,
+      // which is what "much more aggression" actually requires.
+      engageDistance: 240,
+
+      // The floor: no two hulls ever come closer than this.
+      //
+      // It is also, indirectly, the cap on how many ships can be at sea, and
+      // therefore on how violent the sea can get. They share one lane, and the
+      // lane's usable width is about 70 units — bounded by the shore on one
+      // side and the edge of the plate on the other. At 82 no two hulls could
+      // pass abreast at all, so every extra ship had to be separated ALONG the
+      // lane instead, and only three fitted at a time however large the pool.
+      //
+      // 58 is measured from the hulls themselves rather than chosen: they run
+      // 34-56 units of beam, so two average ones at 58 apart still leave a
+      // clear 13 units of water between their edges. Below about 46 they would
+      // actually touch.
+      minSeparation: 58,
 
       // Not every near pass is a fight — otherwise proximity becomes a rule
       // the eye learns in a minute. This is the single number to turn if you
@@ -110,12 +124,17 @@ const NAVY = (() => {
       // exchange, at 0.3 it is an occasional event you catch by luck.
       engageChance: 0.85,
 
+      // Seconds between volleys while two ships remain within range of each
+      // other. THIS is the knob for how violent the sea feels — far more than
+      // engageChance, which only decides whether an opportunity is taken, not
+      // how many opportunities exist.
+      reengageEvery: [3, 7],
+
       // Hard ceiling on concurrent exchanges, so a busy sea cannot pile up
       // animations. The performance budget is a constraint, not an aspiration.
-      maxSimultaneous: 3,
-
-      // The longest a ship will wait for a clear slot before sailing anyway.
-      maxHold: 96,
+      // Each exchange is two <circle> nodes living about a second and a half,
+      // so this is cheap next to a single hull.
+      maxSimultaneous: 5,
 
       // The two ships do not fire together; one is always a beat late.
       volleyStagger: [220, 950],
@@ -271,7 +290,7 @@ const NAVY = (() => {
    * popping into existence. The middle is free to wander; the entrance and
    * the exit are not.
    */
-  function planVoyage(index) {
+  function planVoyage(index, lateral) {
     const F = CONFIG.fleet;
     const orderly = index % F.orderlyEveryN === 0;
     const beam = rand(...F.beam);
@@ -285,7 +304,7 @@ const NAVY = (() => {
       amp * Math.sin(Math.PI * t) * noise(phase + t * freq * 6);
 
     const track = geom.buildTrack({
-      lateral: rand(...F.lateral),
+      lateral: lateral == null ? rand(...F.lateral) : lateral,
       beam: beam * 0.42,
       halfH: geom.hullUp(beam),
       samples: F.samples,
@@ -325,6 +344,34 @@ const NAVY = (() => {
    * a three-minute overlap would be 1800 samples per pair for a figure that a
    * two-stage search gets in about 220.
    */
+  /**
+   * Every stretch of time these two spend within `range` of each other.
+   *
+   * This is what makes the sea aggressive rather than occasional. Finding the
+   * single closest approach and firing once there — which is what this did at
+   * first — means a pair that sails in company for a minute exchanges exactly
+   * one shot, no matter how high the odds are set. The odds were never the
+   * limit; the number of opportunities was.
+   *
+   * Returns [entry, exit] pairs, so gunnery can be scheduled right through each
+   * pass and a long approach becomes a running fight.
+   */
+  function engagementWindows(a, b, range) {
+    const from = Math.max(a.startedAt, b.startedAt);
+    const to = Math.min(a.startedAt + a.duration, b.startedAt + b.duration);
+    if (to <= from) return [];
+    const out = [];
+    let open = null;
+    for (let t = from; t <= to; t += 500) {
+      const pa = positionAt(a, t), pb = positionAt(b, t);
+      const near = pa && pb && Math.hypot(pa.x - pb.x, pa.y - pb.y) <= range;
+      if (near && open === null) open = t;
+      if (!near && open !== null) { out.push([open, t]); open = null; }
+    }
+    if (open !== null) out.push([open, to]);
+    return out;
+  }
+
   function closestApproach(a, b) {
     const from = Math.max(a.startedAt, b.startedAt);
     const to = Math.min(a.startedAt + a.duration, b.startedAt + b.duration);
@@ -385,58 +432,53 @@ const NAVY = (() => {
       // A course that keeps clear of everyone already out there. Checked before
       // a single frame is rendered, so clearance is a guarantee rather than a
       // collision response.
+      const baseStart = performance.now() - skip;
       const others = atSea();
 
-      // Separation on a shared lane is a matter of TIME, not of shape.
+      // SEPARATION BY LANE, NOT BY WAITING.
       //
-      // Redrawing the course does almost nothing, and the measurements say so:
-      // with courses alone, 343 of 533 sampled moments had two hulls inside the
-      // floor and the closest pair reached 25 units. That is not bad luck. Every
-      // ship follows the same authored route with a modest sideways offset, so
-      // two of them are inherently near each other for long stretches however
-      // the noise bends them. What actually keeps ships apart on one lane is
-      // sailing at different times — which is what the old fleet's departure
-      // gap did, and what I lost when speeds started varying.
+      // The previous version held a departure until the whole passage was
+      // provably clear. It worked — hulls never came near each other — and it
+      // was the wrong trade entirely: it kept the sea at two or three ships,
+      // and with so few out there, pairs were rare and gunnery was rare with
+      // them. Measured at its worst: two ships, 563 units apart, not a single
+      // engagement window on the whole chart. Guaranteeing separation had
+      // quietly become a guarantee of nothing happening.
       //
-      // So the free variable is the departure, not the path. For each candidate
-      // course, find the earliest start that clears everyone; take the course
-      // that needs the shortest wait. A ship that cannot fit yet waits for a
-      // gap, exactly as it would in a real seaway.
-      const baseStart = performance.now() - skip;
-      const coarseGap = (track, speed, startedAt) => {
-        const probe = { track, startedAt, duration: (geom.runLength / speed) * 1000 };
+      // So the free variable goes back to being the course, and specifically
+      // its SIDE of the lane. A new ship takes the offset furthest from
+      // everyone already at sea. Separation then lives in the one dimension
+      // that has room to spare, and along-track distance — which is what
+      // actually brings two ships into range of each other — is left free.
+      // Nobody waits, the sea fills, and the fighting follows.
+      const taken = others.map((o) => o.lateral);
+      const [lo, hi] = F.lateral;
+      let lateral = 0, bestApart = -Infinity;
+      for (let k = 0; k <= 8; k++) {
+        const cand = lo + ((hi - lo) * k) / 8;
+        const apart = taken.length ? Math.min(...taken.map((o) => Math.abs(cand - o))) : Infinity;
+        if (apart > bestApart) { bestApart = apart; lateral = cand; }
+      }
+      lateral += rand(-3, 3);        // so the lanes are not visibly quantised
+
+      // A light re-roll for the one case the lane cannot fix: two hulls that
+      // would actually touch. Never a delay — just another course.
+      let v = null;
+      for (let attempt = 0; attempt < F.courseAttempts; attempt++) {
+        const cand = planVoyage(counter + attempt, lateral);
+        const probe = { track: cand.track, startedAt: baseStart,
+                        duration: (geom.runLength / cand.speed) * 1000 };
         let gap = Infinity;
         for (const o of others) {
-          const from = Math.max(probe.startedAt, o.startedAt);
-          const to = Math.min(probe.startedAt + probe.duration, o.startedAt + o.duration);
-          for (let t = from; t <= to; t += 2000) {
-            const pa = positionAt(probe, t), pb = positionAt(o, t);
-            if (!pa || !pb) continue;
-            gap = Math.min(gap, Math.hypot(pa.x - pb.x, pa.y - pb.y));
-          }
+          const c = closestApproach(probe, o);
+          if (c) gap = Math.min(gap, c.d);
         }
-        return gap;
-      };
-
-      let v = null, delay = 0, bestGap = -Infinity, bestDelay = 0;
-      outer:
-      for (let attempt = 0; attempt < F.courseAttempts; attempt++) {
-        const cand = planVoyage(counter + attempt);
-        for (let d = 0; d <= C.maxHold * 1000; d += 6000) {
-          const gap = coarseGap(cand.track, cand.speed, baseStart + d);
-          if (gap > bestGap) { bestGap = gap; v = cand; bestDelay = d; }
-          if (gap >= C.minSeparation) { v = cand; delay = d; break outer; }
-        }
-        if (!v) { v = cand; delay = 0; }
+        v = cand;
+        if (gap >= C.minSeparation) break;
       }
-      if (bestGap < C.minSeparation) delay = bestDelay;   // nothing clean: the roomiest
       counter++;
+      v.lateral = lateral;
 
-      if (delay > 0) {
-        // Not yet. Wait for the gap and try again with the sea as it is then.
-        later(() => { if (ship.state === "idle") sail(ship, Math.max(0, skip - delay)); }, delay);
-        return;
-      }
       const startedAt = baseStart;
 
       ship.state = "sailing";
@@ -444,6 +486,7 @@ const NAVY = (() => {
       dress(ship, v);
       ship.track = v.track;
       ship.beam = v.beam;
+      ship.lateral = v.lateral ?? 0;
       ship.duration = (geom.runLength / v.speed) * 1000;
       ship.startedAt = startedAt;
 
@@ -471,14 +514,19 @@ const NAVY = (() => {
 
     // ---- system 2: proximity and gunnery ------------------------------------
     function scheduleEncounters(ship) {
+      const now = performance.now();
       atSea().forEach((other) => {
         if (other === ship) return;
-        const c = closestApproach(ship, other);
-        if (!c || c.d > C.engageDistance) return;
-        if (rand01() > C.engageChance) return;
-        const at = c.when;
-        if (at <= performance.now()) return;
-        later(() => engage(ship, other), at - performance.now());
+        // Every window they share, and a volley every few seconds THROUGH each
+        // one, not a single shot at the closest point. A pass in company is a
+        // running fight.
+        for (const [entry, exit] of engagementWindows(ship, other, C.engageDistance)) {
+          for (let t = entry; t < exit; t += rand(...C.reengageEvery) * 1000) {
+            if (t <= now) continue;
+            if (rand01() > C.engageChance) continue;
+            later(() => engage(ship, other), t - now);
+          }
+        }
       });
     }
 
@@ -489,7 +537,7 @@ const NAVY = (() => {
       // Neither fires on the same beat as the other.
       fire(a, b, 0);
       fire(b, a, rand(...C.volleyStagger));
-      later(() => { engagements = Math.max(0, engagements - 1); }, 3500);
+      later(() => { engagements = Math.max(0, engagements - 1); }, 2600);
     }
 
     function fire(shooter, target, delay) {
