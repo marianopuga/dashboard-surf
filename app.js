@@ -341,33 +341,9 @@ function crestField(from) {
   return out;
 }
 
-// The fleet. Only size and posture are fixed here — a ship's position and its
-// course are decided per voyage, at run time (see sailFleet).
-//
-// `rot` breaks up the formation a little, so three copies of one plate do not
-// read as clip-art. Two rules it has to obey, both learned the hard way:
-//
-//   No mirroring. One hull used to be drawn scale(-1 1) for variety, and it was
-//   the one that looked wrong on the chart. Mirroring an engraving reverses its
-//   hatching and its light, so the plate stops agreeing with itself and reads
-//   as a wrong-handed twin of the other two rather than as another ship.
-//
-//   All heel the same way. Ships on one course in one wind lean together; two
-//   leaning left and one right reads as a mistake, not as variety. The angles
-//   are smaller now too — 8 degrees was a list, not a heel.
-//
-// `roll` and `heave` are deliberately not multiples of each other: two motions
-// on periods that do not divide evenly never come back into the same
-// relationship, so the combined movement does not repeat, which is what stops
-// it reading as a mechanism.
-const FLEET = [
-  // Smaller than before: the lane runs further out to sea, where these read as
-  // distant shipping, and a wide hull no longer fits between the Long Reef
-  // headland and the edge of the plate.
-  { w: 52, rot: -3, roll: 11,  heave: 7.3 },
-  { w: 44, rot: -5, roll: 8.5, heave: 5.9 },
-  { w: 36, rot: -4, roll: 7,   heave: 4.7 },
-];
+// Ship geometry the CHART needs to know. Everything about how the fleet
+// behaves — how many there are, how they wander, how fast they sail — lives
+// in fleet.js under NAVY.CONFIG.fleet.
 
 // The shipping lane. Ships enter from below the bottom of the plate and leave
 // through the right-hand edge up near Long Reef — they are passing through, on
@@ -418,8 +394,8 @@ const SHIP_ASPECT = 248 / 199;
 let FLEET_NODE = null;
 
 /**
- * A ship's own course: the shipping lane, nudged `off` units to one side so
- * the three do not run in single file down exactly the same line.
+ * A ship's own course: the shipping lane, offset sideways and optionally bent
+ * by a `wander` function so no two ships trace the same line.
  *
  * Two clamps, both of which have bitten before:
  *
@@ -433,9 +409,9 @@ let FLEET_NODE = null;
  *   headland level with its bow is one the centre never sees. Point sampling
  *   put hulls up to 48 units inland off Long Reef and Dee Why.
  */
-function shipTrack(off, beam, halfH) {
+function shipTrack({ lateral = 0, beam = 0, halfH = 0, samples = 48, wander = null }) {
   const pts = [];
-  const N = 48;
+  const N = samples;
   const span = Math.abs(LANE_Y1 - LANE_Y0) / N;
   const reach = halfH + span;
   // No eastern clamp. The route deliberately runs off the right-hand edge, and
@@ -450,7 +426,12 @@ function shipTrack(off, beam, halfH) {
     const k = Math.min(ROUTE.length - 2, Math.floor(f)), frac = f - k;
     const a = ROUTE[k], b = ROUTE[k + 1];
     const y = a.y + (b.y - a.y) * frac;
-    const routeX = a.x + (b.x - a.x) * frac + off;
+    // The wander rides ON the authored route rather than replacing it. Its
+    // envelope falls to zero at both ends (see NAVY.planVoyage), so the two
+    // things the route was hand-placed for — an entrance below the plate and
+    // an exit through the right-hand edge, both off-frame — survive whatever
+    // the noise does in between.
+    const routeX = a.x + (b.x - a.x) * frac + lateral + (wander ? wander(t) : 0);
 
     let shore = -Infinity;
     for (let d = -reach; d <= reach; d += reach / 8) {
@@ -501,62 +482,29 @@ function tideGauge(cond, x, h) {
 }
 
 /**
- * Send the fleet sailing: each ship works north along the coast, thins out at
- * the top, and comes back up from the bottom to do it again.
+ * Hand the fleet over to NAVY (fleet.js), which owns everything about how the
+ * ships behave. This file keeps only what is genuinely the CHART's: where the
+ * shipping lane runs, where the shoreline is, and which water is closed.
  *
- * One animation per ship, running forever, rather than a fresh voyage
- * scheduled each time one ends. That is what makes it safe as well as simple.
- * The three share one sea lane and no hull can pass another in it, so they have
- * to stay strung out — and with `iterations: Infinity` plus a different
- * `iterationStart` each, the spacing is fixed by construction and cannot drift.
- * Every earlier version rescheduled voyages and so had to defend that spacing
- * at run time: first with bands (which cut each passage to a fifth of the
- * coast), then with departure gating and a near-common speed (which only
- * bounded the drift rather than removing it).
- *
- * It also means nothing accumulates. Element.animate() *adds* an animation, so
- * a new one per voyage left every finished one filling forever.
+ * The split matters because the fleet is decoration and the chart is data. A
+ * squadron that wanders, fights and sinks has no business reaching into the
+ * code that decides where Dee Why is, and the geometry has no business knowing
+ * a ship can be sunk.
  */
 function sailFleet(svg) {
-  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
-  const RUN = LANE_Y1 - LANE_Y0;
-  // One duration for all of them. Different speeds in a lane nobody can
-  // overtake in means a fast ship eventually closes on a slow one; identical
-  // speeds hold the formation exactly.
-  const dur = (RUN / SHIP_SPEED) * 1000;
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  svg.querySelectorAll(".ship-voyage").forEach((g, i) => {
-    const beam = FLEET[i].w * 0.5;
-    const track = shipTrack(rand(-9, 9), beam, FLEET[i].w * SHIP_ASPECT * 0.5);
-
-    if (reduced) {
-      // Becalmed, but still strung out along the lane rather than stacked, and
-      // at points that are on the plate rather than off either end of it.
-      const p = track[Math.round((0.3 + i * 0.2) * (track.length - 1))];
-      g.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
-      g.style.opacity = 1;
-      return;
-    }
-
-    // Fully opaque the whole way. The plate's own edges do the appearing and
-    // disappearing: a ship is simply outside the frame at both ends of its run.
-    const frames = track.map((p, k) => ({
-      offset: k / (track.length - 1),
-      transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`,
-      opacity: 1,
-    }));
-
-    g.animate(frames, {
-      duration: dur,
-      easing: "linear",
-      iterations: Infinity,
-      // Evenly spaced around the loop, so the three are strung out up the coast
-      // at every moment including the first frame: a third of a run apart is
-      // ~163 units, against a tallest hull of 82.
-      iterationStart: i / FLEET.length,
-    });
+  NAVY.configure({
+    // The course, clamped to the coast and the closed water.
+    buildTrack: (opts) => shipTrack(opts),
+    // How far a hull of this beam reaches above the waterline, which is what
+    // the shoreline clearance has to be measured against.
+    hullUp: (beam) => beam * SHIP_ASPECT * 0.5,
+    // The hull itself, at the beam and heel this voyage drew.
+    hull: (beam, heel) =>
+      `<g transform="rotate(${heel.toFixed(1)})">${
+        CHROME.plate("assets/ship-cutout.png", 0, 0, beam, "ship", SHIP_ASPECT)}</g>`,
+    runLength: LANE_Y1 - LANE_Y0,
   });
+  NAVY.launch(svg);
 }
 
 /**
@@ -751,29 +699,8 @@ function renderChart(rows, cond, activeId) {
   // radiate from — an unmarked bearing node is ordinary on a portolan chart.
   const ROSE = { x: 266, y: 566, r: 20 };
 
-  // The fleet. Each ship is drawn at the origin and moved entirely by an
-  // animation assigned in JS (see sailFleet), so the markup here carries no
-  // position at all — that is what lets each voyage be different and lets a
-  // new one be chosen every time a ship sails off.
-  const fleet = FLEET.map((s, i) => `
-    <g class="ship-voyage" data-ship="${i}">
-      <!-- The water the hull has pushed aside. This is a filled patch of sea
-           colour laid OVER the crests, not a hole cut in them, which is the
-           whole reason it can move: a mask would have to be re-cut every frame
-           to follow a ship, whereas a sibling inside the moving group follows
-           for free. Its soft edge makes the swell fade out around the hull
-           rather than stop against a rim. -->
-      <ellipse class="ship-clearing" cx="0" cy="0"
-               rx="${(s.w * 0.62).toFixed(1)}" ry="${(s.w * 0.72).toFixed(1)}"
-               fill="url(#ship-clearing)"/>
-      <g class="ship-heave" style="--dur:${s.heave}s">
-        <g class="ship-roll" style="--dur:${s.roll}s">
-          <g transform="rotate(${s.rot})">
-            ${CHROME.plate("assets/ship-cutout.png", 0, 0, s.w, "ship", SHIP_ASPECT)}
-          </g>
-        </g>
-      </g>
-    </g>`).join("");
+  // The fleet's markup belongs to fleet.js along with its behaviour.
+  const fleet = NAVY.markup();
 
   const active = SPOTS.find((s) => s.id === activeId);
   const activeScore = rows.find((r) => r.spot.id === activeId)?.score;

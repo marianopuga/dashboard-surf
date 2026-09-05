@@ -928,13 +928,13 @@ a:hover { color: var(--coffee-deep); }
      earlier single "bob" read as mechanical. Both are pure transforms, so they
      composite without touching layout. */
   .ship-roll {
-    animation: ship-roll var(--dur, 9s) ease-in-out infinite;
+    animation: ship-roll var(--roll, 9s) ease-in-out infinite;
     transform-box: fill-box;
     transform-origin: 50% 78%;   /* the waterline, not the masthead */
     will-change: transform;
   }
   .ship-heave {
-    animation: ship-heave var(--dur, 6s) ease-in-out infinite;
+    animation: ship-heave var(--heave, 6s) ease-in-out infinite;
     transform-box: fill-box;
     transform-origin: 50% 78%;
     will-change: transform;
