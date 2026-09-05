@@ -50,6 +50,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        # No caching headers at all was the bug. With no Cache-Control, no
+        # ETag and no Last-Modified, a browser falls back to HEURISTIC caching
+        # and is free to keep serving a file it fetched minutes ago — which is
+        # why edits kept appearing not to have happened and a hard reload was
+        # the only way to see them. This is a dev server; it should never be
+        # the reason something looks unchanged.
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
 

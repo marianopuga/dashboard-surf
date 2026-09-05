@@ -3,7 +3,20 @@
   "functions": {
     "api/*.py": {
       "includeFiles": "api/_lib.py",
-      "regions": ["syd1"]
+      "regions": [
+        "syd1"
+      ]
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
 }
