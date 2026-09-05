@@ -94,14 +94,16 @@ const NAVY = (() => {
     combat: {
       // Two ships closer than this may engage.
       //
-      // Set from the shape of the lane, not by feel. The lane is ~70 units wide
-      // and ~600 long, so what separates two ships is almost always the
-      // distance ALONG it, not across — which means this figure is really
-      // "how far up the lane a gunner will bother shooting". At 165 only one
-      // pair in three ever qualified and the sea was quiet; at 240 ships in
-      // the same stretch of water are in range of each other most of the time,
-      // which is what "much more aggression" actually requires.
-      engageDistance: 240,
+      // Read as a gunnery range, and the two ends of the argument are visible
+      // on the chart. At 240 — nearly half the length of the lane — ships were
+      // firing from clear across the sea, which reads as noise rather than as a
+      // fight. At 120 they had to be practically rubbing gunwales, and a fight
+      // you only get when two hulls nearly touch is a fight you rarely get.
+      //
+      // 170 is roughly three or four hull-widths: near enough that the two are
+      // plainly each other's business, far enough that they open fire on the
+      // approach instead of only at the pass.
+      engageDistance: 170,
 
       // The floor: no two hulls ever come closer than this.
       //
@@ -127,8 +129,16 @@ const NAVY = (() => {
       // Seconds between volleys while two ships remain within range of each
       // other. THIS is the knob for how violent the sea feels — far more than
       // engageChance, which only decides whether an opportunity is taken, not
-      // how many opportunities exist.
-      reengageEvery: [3, 7],
+      // how many opportunities exist. At [3,7] there was a volley somewhere
+      // every couple of seconds, which was too much; [7,14] overcorrected into
+      // quiet. This is the middle, and it is the first number to touch if the
+      // sea ever needs turning up or down again.
+      //
+      // Note that this is only half of how busy the sea feels: shortening
+      // engageDistance cuts the seconds two ships spend in range at all, so the
+      // two knobs multiply. Measured on one four-ship sea, the pair of changes
+      // took ~32 volleys a passage down to ~13.
+      reengageEvery: [4, 8],
 
       // Hard ceiling on concurrent exchanges, so a busy sea cannot pile up
       // animations. The performance budget is a constraint, not an aspiration.
