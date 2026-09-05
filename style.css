@@ -1040,6 +1040,51 @@ a:hover { color: var(--coffee-deep); }
    list that deepens, and the hull losing a little of its ink. */
 .ship-voyage.dmg-1 .ship-hull { opacity: 0.9; }
 .ship-voyage.dmg-2 .ship-hull { opacity: 0.78; }
+
+/* --- destruction --------------------------------------------------------
+   The wreck is the ship's own plate drawn once per piece and clipped, so the
+   pieces inherit the plate's treatment for free and there is nothing here to
+   colour. What matters is what is NOT here: no opacity animation on any piece.
+   A piece leaves the chart by going under the waterline clip, never by fading,
+   which is the difference between sinking and being switched off. */
+.wreck-piece { will-change: transform; }
+.wreck-splinter {
+  fill: none;
+  stroke: var(--raisin);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0.72;
+}
+.wash-ring {
+  fill: none;
+  stroke: var(--olive);
+  stroke-width: 0.9;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.hit-tick {
+  fill: none;
+  stroke: var(--raisin);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.splash-ring, .splash-lip {
+  fill: none;
+  stroke: var(--olive);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.muzzle path {
+  fill: none;
+  stroke: var(--olive);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+/* Her smoke thins out once she is going down — it should not outlast the hull
+   by much, but it should not snap off either. */
+.ship-voyage.is-sinking .smoke { animation: smoke-out 2.8s ease-out forwards; }
+@keyframes smoke-out { to { opacity: 0; } }
 /* The roll stops once she is down by the head. A wallowing hull does not ride
    the swell any more, and leaving the animation running fights the list. */
 .ship-voyage.dmg-2 .ship-roll,
